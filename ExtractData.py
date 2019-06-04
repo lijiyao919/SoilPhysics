@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*
 #Import suds for connecting to the web service.
 from suds.client import Client
-import numpy as np
 import csv
 import datetime
-from inspect import getsourcefile
-from os.path import abspath, basename
-import sys
 import numpy as np
 from MesoPy import *
 
@@ -28,7 +24,7 @@ class Precipitation(object):
         self.endDate_meso=endDate_meso #End Date in Mesowest Format
 
     # * retrieving date *#
-startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
+startDate = dt.strptime("2018-05-21 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
 startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
 starDate_Meso_str=str(startDate.strftime("%Y%m%d%H%M"))
 starDate_Snortel_str=str(startDate)
@@ -655,7 +651,7 @@ def GetMesoWestData(count):
         i += 1
     return data_array_Meso
 
-start_time = dt.now()  # for counting program running time
+startTime_all = dt.now()  # for counting program running time
 header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
          "Start Date", "Precipitation for 1 day", "Precipitation for 2 days", "Precipitation for 3 days", "Precipitation for 4 days", "Precipitation for 5 days",
          "sm_2", "sm_4", "sm_8", "sm_20", "sm_40", "st_2", "st_4", "st_8", "st_20", "st_40"]]
@@ -663,16 +659,32 @@ header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(me
     IUtahArray=GetIUtahData()
 except:'''
 #print("Server is not responding")
-SnortelArray=GetSnortelData(1)# Data from Snortel Network
-ScanArray=GetScanData(1+len(SnortelArray)) #Data from Scan Network
-MesoWestArray=GetMesoWestData(1+len(SnortelArray)+len(ScanArray))#Data from MesoWest Network
+
+# Data from Snortel Network
+startTime_sntl = dt.now()
+SnortelArray=GetSnortelData(1)
+endTime_sntl = dt.now()
+print ("SNTL Time: %s" % (endTime_sntl - startTime_sntl))
+
+#Data from Scan Network
+startTime_scan = dt.now()
+ScanArray=GetScanData(1+len(SnortelArray))
+endTime_scan = dt.now()
+print ("SCAN Time: %s" % (endTime_scan - startTime_scan))
+
+#Data from MesoWest Network
+startTime_meso = dt.now()
+MesoWestArray=GetMesoWestData(1+len(SnortelArray)+len(ScanArray))
+endTime_meso = dt.now()
+print ("MESO Time: %s" % (endTime_meso - startTime_meso))
+
 data_array = np.vstack((header, SnortelArray,ScanArray,MesoWestArray)) #Combining data from all networks
 startDate_str=startDate_str.replace(":","-")
 with open('UnitPrec_5day'+startDate_str+'.csv','wb') as f: #write in csv file
     writer = csv.writer(f)
     writer.writerows(data_array)  # data summary
-end_time = dt.now()  #for counting program running time
-print ("--- %s time ---" % (end_time - start_time)) #output run time
+endTime_all = dt.now()  #for counting program running time
+print ("Overall Time: %s" % (endTime_all - startTime_all)) #output run time
 
 
 
