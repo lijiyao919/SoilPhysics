@@ -24,7 +24,7 @@ class Precipitation(object):
         self.endDate_meso=endDate_meso #End Date in Mesowest Format
 
     # * retrieving date *#
-startDate = dt.strptime("2018-05-21 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
+startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
 startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
 starDate_Meso_str=str(startDate.strftime("%Y%m%d%H%M"))
 starDate_Snortel_str=str(startDate)
@@ -265,7 +265,7 @@ def GetSnortelData(count):
 
     # * a data array for storing retrieved data *#
     data_array_snortel = [[defaultValue] * 25 for row in
-                  range(1, num_stations_validate + 2)]  # a data array for storing retrieved data
+                  range(1, num_stations_validate + 1)]  # a data array for storing retrieved data
     if meta:
         i = 0  # iteration for valid stations
         for validSite in meta:
