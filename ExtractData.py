@@ -5,6 +5,8 @@ import csv
 import datetime
 import numpy as np
 from MesoPy import *
+from multiprocessing.pool import ThreadPool as Pool
+import traceback
 
 #* time setting *#
 dt = datetime.datetime
@@ -24,7 +26,7 @@ class Precipitation(object):
         self.endDate_meso=endDate_meso #End Date in Mesowest Format
 
     # * retrieving date *#
-startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
+startDate = dt.strptime("2018-04-15 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
 startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
 starDate_Meso_str=str(startDate.strftime("%Y%m%d%H%M"))
 starDate_Snortel_str=str(startDate)
@@ -32,6 +34,7 @@ endDate_str = startDate_str
 PrecipitationPeriod = []
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
+
 
 for i in range(0, NumberOfDays + 1):
         tdelta = datetime.timedelta(days=i)
@@ -170,62 +173,29 @@ def GetIUtahData(count):
         i += 1
     return data_array_iUtah
 
+def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, count):
+    try:
+        print('Start Snortel Row: {}'.format(i+1))
+        sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
+        sensor_TOBS = r"TOBS"  # TOBS, AIR TEMPERATURE OBSERVED, Fahrenheit
+        sensor_PREC = r"PREC"  # PREC, PRECIPITATION ACCUMULATION, Inches
+        sensor_SMS = r"SMS"  # SMS, SOIL MOISTURE PERCENT (Hourly), pct
+        sensor_STO = r"STO"  # STO, SOIL TEMPERATURE OBSERVED, Fahrenheit
 
-def GetSnortelData(count):
-    # * AWDB (Air-Water Database) web service *#
-    wsdl = r"https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
-    awdb = Client(wsdl)
-    network = r"SNTL"        # SNTL network
-    sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
-    sensor_TOBS = r"TOBS"    # TOBS, AIR TEMPERATURE OBSERVED, Fahrenheit
-    sensor_PREC = r"PREC"    # PREC, PRECIPITATION ACCUMULATION, Inches
-    sensor_SMS = r"SMS"      # SMS, SOIL MOISTURE PERCENT (Hourly), pct
-    sensor_STO = r"STO"      # STO, SOIL TEMPERATURE OBSERVED, Fahrenheit
-    state = r"UT"            # STATE
-
-    # height variables at different depth*#
-    heights = awdb.service.getHeightDepths()
-    for z in heights:
-        if z.unitCd=="in":
-            if z.value == -2:
-                heights_2 = [z]
-            elif z.value == -4:
-                heights_4 = [z]
-            elif z.value == -8:
-                heights_8 = [z]
-            elif z.value == -20:
-                heights_20 = [z]
-            elif z.value == -40:
-                heights_40 = [z]
-    #print(heights_40)
-
-    # get stations' info from SCAN
-    stations = awdb.service.getStations("*", state, network, "*", "*", -1000, 1000, -1000, 1000, 0, 29000, "*", 1, None, True)
-    #print('station: ',stations)
-    # * get metadata of the stations from SCAN *#
-    meta = awdb.service.getStationMetadataMultiple(stations)  # get metadata of the stations from SCAN
-    meta[:] = [x for x in meta if isActive(x)]  # eliminate the inactive stations
-    num_stations_validate = len(meta)  # number of active stations
-
-    # * a data array for storing retrieved data *#
-    data_array_snortel = [[defaultValue]*25 for row in range(num_stations_validate)]  # a data array for storing retrieved data
-
-    i = 0 # iteration for valid stations
-    for validSite in meta:
-        data_array_snortel[i][0] = count+i # serial number
+        data_array_snortel[i][0] = count + i  # serial number
         geo = awdb.service.getStationMetadata(validSite.stationTriplet)  # geo-information: elevation (ft), longtitude, altitude
         data_array_snortel[i][1] = geo.name  # station name
-        data_array_snortel[i][3] ="SNORTEL"
+        data_array_snortel[i][3] = "SNORTEL"
         data_array_snortel[i][4] = 0.3048 * geo.elevation  # elevation, convert ft to meter
         data_array_snortel[i][5] = geo.latitude  # latitude
         data_array_snortel[i][6] = geo.longitude  # longitude
 
-        #wind speed (mph) of the retrieved date
+        # wind speed (mph) of the retrieved date
         wind_speed = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_WSPDV, 1, None,
                                                        starDate_Snortel_str, starDate_Snortel_str, 'ALL',
                                                        'ENGLISH')
         data_array_snortel[i][7] = defaultValue if 'beginDate' not in wind_speed[0] or 'endDate' not in wind_speed[0] or \
-                                                    wind_speed[0].values[0] == "" or 'value' not in wind_speed[0].values[0] \
+                                                   wind_speed[0].values[0] == "" or 'value' not in wind_speed[0].values[0] \
                                                 else 0.44704 * wind_speed[0].values[0].value  # wind_speed, convert mph to m/s
 
         # air temperature (Fahrenheit) of the retrieved date
@@ -233,29 +203,42 @@ def GetSnortelData(count):
                                                      starDate_Snortel_str, starDate_Snortel_str, 'ALL',
                                                      'ENGLISH')
         data_array_snortel[i][8] = defaultValue if 'beginDate' not in air_temp[0] or 'endDate' not in air_temp[0] or \
-                                                    air_temp[0].values[0] == "" or 'value' not in air_temp[0].values[0] \
+                                                   air_temp[0].values[0] == "" or 'value' not in air_temp[0].values[0] \
                                                 else (air_temp[0].values[0].value - 32) * 5 / 9  # air temp, convert Fahrenheit to Celsius
+
+        # height variables at different depth*#
+        for z in heights:
+            if z.unitCd == "in":
+                if z.value == -2:
+                    heights_2 = [z]
+                elif z.value == -4:
+                    heights_4 = [z]
+                elif z.value == -8:
+                    heights_8 = [z]
+                elif z.value == -20:
+                    heights_20 = [z]
+                elif z.value == -40:
+                    heights_40 = [z]
 
         col_sm = 15
         col_st = 20
         for height in [heights_2, heights_4, heights_8, heights_20, heights_40]:
             # soil moisture (pct)
             sm = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_SMS, 1, height,
-                                                     starDate_Snortel_str,
-                                                     starDate_Snortel_str, 'ALL', 'ENGLISH')
+                                                   starDate_Snortel_str,
+                                                   starDate_Snortel_str, 'ALL', 'ENGLISH')
             # soil temperature (Fahrenheit)
             st = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_STO, 1, height,
-                                                     starDate_Snortel_str, starDate_Snortel_str, 'ALL',
-                                                     'ENGLISH')
+                                                   starDate_Snortel_str, starDate_Snortel_str, 'ALL',
+                                                   'ENGLISH')
             data_array_snortel[i][col_sm] = defaultValue if 'beginDate' not in sm[0] or 'endDate' not in sm[0] or \
-                                                        sm[0].values[0] == "" or 'value' not in sm[0].values[0] \
-                                                     else sm[0].values[0].value / 100  # sms, convert pct to decimal
+                                                            sm[0].values[0] == "" or 'value' not in sm[0].values[0] \
+                                                         else sm[0].values[0].value / 100  # sms, convert pct to decimal
             data_array_snortel[i][col_st] = defaultValue if 'beginDate' not in st[0] or 'endDate' not in st[0] or \
                                                             st[0].values[0] == "" or 'value' not in st[0].values[0] \
-                                                     else round((st[0].values[0].value - 32) * 5 / 9, 2) # sto, convert Fahrenheit to Celsius
-            col_sm=col_sm+1
-            col_st=col_st+1
-
+                                                         else round((st[0].values[0].value - 32) * 5 / 9, 2)  # sto, convert Fahrenheit to Celsius
+            col_sm = col_sm + 1
+            col_st = col_st + 1
 
         # prec (inches) of the retrieved date
         prec = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_PREC, 1, None,
@@ -275,12 +258,41 @@ def GetSnortelData(count):
                                                             'values' not in prec[0] or \
                                                             prec[0].values[0].value < dayPrecipitate[0].values[0].value \
                                                          else 25.4 * (prec[0].values[0].value - dayPrecipitate[0].values[0].value)
-
+        print('---Finish Snorel Row: {}'.format(i+1))
         '''print (data_array_snortel[i][0], data_array_snortel[i][1], data_array_snortel[i][2], data_array_snortel[i][3], data_array_snortel[i][4], data_array_snortel[i][5],
-                  data_array_snortel[i][6], data_array_snortel[i][7], data_array_snortel[i][8], data_array_snortel[i][9], data_array_snortel[i][10], data_array_snortel[i][11],
-                  data_array_snortel[i][12], data_array_snortel[i][13], data_array_snortel[i][14], data_array_snortel[i][15], data_array_snortel[i][16], data_array_snortel[i][17],
-                  data_array_snortel[i][18], ata_array_snortel[i][19], data_array_snortel[i][20], data_array_snortel[i][21], data_array_snortel[i][22], data_array_snortel[i][23],data_array_snortel[i][24])'''
-        i += 1
+               data_array_snortel[i][6], data_array_snortel[i][7], data_array_snortel[i][8], data_array_snortel[i][9], data_array_snortel[i][10], data_array_snortel[i][11],
+               data_array_snortel[i][12], data_array_snortel[i][13], data_array_snortel[i][14], data_array_snortel[i][15], data_array_snortel[i][16], data_array_snortel[i][17],
+               data_array_snortel[i][18], data_array_snortel[i][19], data_array_snortel[i][20], data_array_snortel[i][21], data_array_snortel[i][22], data_array_snortel[i][23],data_array_snortel[i][24])'''
+    except Exception as e:
+        print('Snortel Row {} Fail'.format(i+1))
+        print(traceback.format_exc())
+
+def GetSnortelData(count):
+    # * AWDB (Air-Water Database) web service *#
+    wsdl = r"https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
+    awdb = Client(wsdl)
+    network = r"SNTL"        # SNTL network
+    state = r"UT"            # STATE
+
+    # get stations' info from SCAN
+    stations = awdb.service.getStations("*", state, network, "*", "*", -1000, 1000, -1000, 1000, 0, 29000, "*", 1, None, True)
+    #print('station: ',stations)
+    # get height format
+    heights = awdb.service.getHeightDepths()
+    # get metadata of the stations from SCAN *#
+    meta = awdb.service.getStationMetadataMultiple(stations)  # get metadata of the stations from SCAN
+    meta[:] = [x for x in meta if isActive(x)]  # eliminate the inactive stations
+    num_stations_validate = len(meta)  # number of active stations
+
+    # * a data array for storing retrieved data *#
+    data_array_snortel = [[None]*25 for row in range(num_stations_validate)]  # a data array for storing retrieved data
+
+    pool = Pool()
+    for i, validSite in enumerate(meta):
+        pool.apply_async(getStationDataFromSnotel, (awdb, validSite, heights, data_array_snortel, i, count))
+    pool.close()
+    pool.join()
+
     return data_array_snortel
 
 def GetScanData(count):
@@ -505,7 +517,7 @@ endTime_sntl = dt.now()
 print ("SNTL Time: %s" % (endTime_sntl - startTime_sntl))
 
 #Data from Scan Network
-startTime_scan = dt.now()
+'''startTime_scan = dt.now()
 ScanArray=GetScanData(1+len(SnortelArray))
 endTime_scan = dt.now()
 print ("SCAN Time: %s" % (endTime_scan - startTime_scan))
@@ -525,16 +537,18 @@ except:
     print('Server has been hang up.')
     IUtah_done = False
 endTime_iutah = dt.now()
-print ("IUTAH Time: %s" % (endTime_iutah - startTime_iutah))
+print ("IUTAH Time: %s" % (endTime_iutah - startTime_iutah))'''
 
 #Combining data from all networks
-if IUtah_done:
+'''if IUtah_done:
     data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray, IUTAH))
 else:
-    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray))
+    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray))'''
+
+data_array = np.vstack((header, SnortelArray))
 
 startDate_str=startDate_str.replace(":","-")
-with open('UnitPrec_5day'+startDate_str+'.csv','wb') as f: #write in csv file
+with open('Parallel_'+startDate_str+'.csv','wb') as f: #write in csv file
     writer = csv.writer(f)
     writer.writerows(data_array)  # data summary
 endTime_all = dt.now()  #for counting program running time
