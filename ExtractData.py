@@ -46,7 +46,6 @@ for i in range(0, NumberOfDays + 1):
         endDate_snortel=beginDate_snortel
         dayPrecipitation = Precipitation(beginDate, endDate,beginDate_snortel,endDate_snortel,beginDate_Meso,endDate_meso)
         PrecipitationPeriod.append(dayPrecipitation) # adding all the dates needed for
-#data_array = [[defaultValue] * 25 for row in range(1, 200)]# dataArray initialization with default values
 
 def isActive(x): #check if a station is still active or not
     # * time setting *#
