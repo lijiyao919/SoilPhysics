@@ -35,7 +35,7 @@ endDate_str = startDate_str
 PrecipitationPeriod = []
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
-delay_iutah=2
+delay_iutah=20
 
 for i in range(0, NumberOfDays + 1):
         tdelta = datetime.timedelta(days=i)
@@ -60,18 +60,6 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
         print('Start IUtah Station: {}'.format(i+1))
         # * retrieving info & parameters *#
         networkCode = 'iutah'
-        air_temp = 'AirTemp_ST110_Avg'  # avaeraged air temperature , degC
-        wind_speed = 'WindSp_Avg'  # Wind speed, m/s
-        SMS_5cm = 'VWC_5cm_Avg'  # Volumetric water content: -5cm, -2inch, pct
-        SMS_10cm = 'VWC_10cm_Avg'  # Volumetric water content: -10cm, -4inch, pct
-        SMS_20cm = 'VWC_20cm_Avg'  # Volumetric water content: -20cm, -8inch, pct
-        SMS_50cm = 'VWC_50cm_Avg'  # Volumetric water content: -50cm, -20inch, pct
-        SMS_100cm = 'VWC_100cm_Avg'  # Volumetric water content: -100cm, -40inch, pct
-        ST_5cm = 'SoilTemp_5cm_Avg'  # soil temprature: -5cm, -2inch, degC
-        ST_10cm = 'SoilTemp_10cm_Avg'  # soil temprature: -10cm, -4inch, degC
-        ST_20cm = 'SoilTemp_20cm_Avg'  # soil temprature: -20cm, -8inch, degC
-        ST_50cm = 'SoilTemp_50cm_Avg'  # soil temprature: -50cm, -20inch, degC
-        ST_100cm = 'SoilTemp_100cm_Avg'  # soil temprature: -100cm, -40inch, degC
         PREC = 'Precip_Tot_Avg'  # Total Precipitation, cm
         qcLevelCode = '0'  # quality contral level
 
@@ -82,53 +70,57 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
         data_array_iUtah[i][0] = i+count  # serial number
 
         time.sleep(i * delay_iutah)
-        siteInfoResult = service.GetSiteInfoObject(networkCode + ':' + siteCode)
-        siteName = siteInfoResult.site[0].siteInfo.siteName
-        data_array_iUtah[i][1] = siteName  # site name
+        #print('Thread {} access all sites'.format(i+1))
+        SiteObject = service.GetValuesForASiteObject(networkCode + ':' + siteCode, startDate_str, startDate_str)
+        #Site Info
+        data_array_iUtah[i][1] = SiteObject.timeSeries[0].sourceInfo.siteName # site name
         data_array_iUtah[i][2] = siteCode  # site short name
-        data_array_iUtah[i][3]="iUtah"# network Name
-        siteElevation = siteInfoResult.site[0].siteInfo.elevation_m
-        data_array_iUtah[i][4] = siteElevation  # elevation
-        siteLatitude = siteInfoResult.site[0].siteInfo.geoLocation.geogLocation.latitude
-        data_array_iUtah[i][5] = siteLatitude  # latitude
-        siteLongitude = siteInfoResult.site[0].siteInfo.geoLocation.geogLocation.longitude
-        data_array_iUtah[i][6] = siteLongitude  # Longitude
+        data_array_iUtah[i][3] = "iUtah"  # network Name
+        data_array_iUtah[i][4] = SiteObject.timeSeries[0].sourceInfo.elevation_m  # elevation
+        data_array_iUtah[i][5] = SiteObject.timeSeries[0].sourceInfo.geoLocation.geogLocation.latitude  # latitude
+        data_array_iUtah[i][6] = SiteObject.timeSeries[0].sourceInfo.geoLocation.geogLocation.longitude #longitude
 
-        # * retrieving wind speed at the retrieving day*#
-        time.sleep(i * delay_iutah)
-        variable_wind_speed = service.GetValuesObject(networkCode + ':' + siteCode,
-                                                      networkCode + ':' + wind_speed
-                                                      + '/qualityControlLevelCode=' + qcLevelCode, startDate_str,
-                                                      startDate_str)
-        if variable_wind_speed.timeSeries[0].values[0] == "" or variable_wind_speed.timeSeries[0].values[0].value == -9999:
+        #Wind Speed
+        variable_wind_speed = SiteObject.timeSeries[3].values[0].value[0].value
+        if variable_wind_speed == "" or variable_wind_speed == -9999:
             value_wind_speed = defaultValue  # missing data
         else:
-            data_array_iUtah[i][7] = variable_wind_speed.timeSeries[0].values[0].value[0].value # wind speed
+            data_array_iUtah[i][7] = variable_wind_speed  # wind speed
 
-        # retrieving air temp at the retrieving day*#
-        time.sleep(i * delay_iutah)
-        variable_air_temp = service.GetValuesObject(networkCode + ':' + siteCode,
-                                                    networkCode + ':' + air_temp
-                                                    + '/qualityControlLevelCode=' + qcLevelCode, startDate_str,
-                                                    startDate_str)
+        #Air Temp
+        variable_air_temp = SiteObject.timeSeries[54].values[0].value[0].value
+        if variable_air_temp == "" or variable_air_temp == -9999:
+            variable_air_temp = defaultValue  # missing data
+        else:
+            data_array_iUtah[i][8] = variable_air_temp  # air temp
 
-        # exclude the missing data for air temp
-        data_array_iUtah[i][8] = defaultValue if variable_air_temp.timeSeries[0].values[0] == "" or \
-                                                 variable_air_temp.timeSeries[0].values[0].value == -9999 \
-                                              else variable_air_temp.timeSeries[0].values[0].value[0].value
-
+        #time
         data_array_iUtah[i][9] = str(startDate)
 
-        #Precipitation
-        time.sleep(i * delay_iutah)
-        prec = service.GetValuesObject(networkCode + ':' + siteCode, networkCode + ':' + PREC
-                                       + '/qualityControlLevelCode=' + qcLevelCode, startDate_str, startDate_str)
+        # Soil Moisture
+        col_sms = 15
+        k = 0
+        for j in range(5):
+            value_SMS = float(SiteObject.timeSeries[28+k].values[0].value[0].value)
+            data_array_iUtah[i][col_sms+j] = defaultValue if value_SMS == -9999.0 else value_SMS / 100  # sms, convert pct to decimal
+            k=k+4
+
+        # Soil Temperature
+        col_st = 20
+        k=0
+        for j in range(5):
+            value_ST = float(SiteObject.timeSeries[29+k].values[0].value[0].value)
+            data_array_iUtah[i][col_st+j] = defaultValue if value_ST == -9999.0 else round(value_ST, 2)
+            k=k+4
+
+        # Precipitation
+        prec = SiteObject.timeSeries[6].values[0].value[0].value
 
         for j in range(0, NumberOfDays):
-            if prec.timeSeries[0].values[0] == "" or prec.timeSeries[0].values[0].value[0] == "":
+            if prec == "" :
                 data_array_iUtah[i][10 + j] = defaultValue
             else:
-                time.sleep(i * delay_iutah)
+                #print('Thread {} access precs'.format(i+1))
                 dayPrecipitate = service.GetValuesObject(networkCode + ':' + siteCode,
                                                          networkCode + ':' + PREC
                                                          + '/qualityControlLevelCode=' + qcLevelCode,
@@ -137,30 +129,8 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
                 # validating the data obtained and if failed assigning default value
                 data_array_iUtah[i][10 + j] = defaultValue if dayPrecipitate.timeSeries[0].values[0] == "" or \
                                                               dayPrecipitate.timeSeries[0].values[0].value[0] == "" or \
-                                                              float(prec.timeSeries[0].values[0].value[0].value) < float(dayPrecipitate.timeSeries[0].values[0].value[0].value) \
-                                                           else round((float(prec.timeSeries[0].values[0].value[0].value) - float(dayPrecipitate.timeSeries[0].values[0].value[0].value)) * 10, 4)
-
-        #Soil Moisture
-        col_sms = 15
-        for SMS in [SMS_5cm, SMS_10cm, SMS_20cm, SMS_50cm, SMS_100cm ]:
-            time.sleep(i * delay_iutah)
-            variable_SMS = service.GetValuesObject(networkCode + ':' + siteCode,
-                                                       networkCode + ':' + SMS  + '/qualityControlLevelCode=' + qcLevelCode, startDate_str,
-                                                       startDate_str)
-            value_SMS = float(variable_SMS.timeSeries[0].values[0].value[0].value)
-            data_array_iUtah[i][col_sms] = defaultValue if value_SMS == -9999.0 else value_SMS / 100  # sms, convert pct to decimal
-            col_sms=col_sms+1
-
-        #Soil Temperature
-        col_st = 20
-        for ST in [ST_5cm, ST_10cm, ST_20cm, ST_50cm, ST_100cm]:
-            time.sleep(i * delay_iutah)
-            variable_ST_5cm = service.GetValuesObject(networkCode + ':' + siteCode,
-                                                      networkCode + ':' + ST + '/qualityControlLevelCode=' + qcLevelCode, startDate_str,
-                                                      startDate_str)
-            value_ST = float(variable_ST_5cm.timeSeries[0].values[0].value[0].value)
-            data_array_iUtah[i][col_st] = defaultValue if value_ST == -9999.0 else round(value_ST, 2)
-            col_st=col_st+1
+                                                              float(prec) < float(dayPrecipitate.timeSeries[0].values[0].value[0].value) \
+                                                           else round((float(prec) - float(dayPrecipitate.timeSeries[0].values[0].value[0].value)) * 10, 4)
 
         print('---Finish IUtah Station: {}'.format(i + 1))
         '''print (data_array_iUtah[i][0],data_array_iUtah[i][1],data_array_iUtah[i][2],data_array_iUtah[i][3],data_array_iUtah[i][4],
@@ -187,7 +157,7 @@ def getIUtahData(count):
     serviceArray = [service_LoganRiver, service_Rebutte]
     data_array_iUtah = [[None] * 25 for row in range(num_sites)]
 
-    pool = Pool(processes=8)
+    pool = Pool(processes=3)
     for i, validSite in enumerate(siteCodes):
         pool.apply_async(getStationDataFromIUtah, (serviceArray, validSite, data_array_iUtah, i, count))
         #getStationDataFromIUtah(serviceArray, validSite, data_array_iUtah, i, count)
