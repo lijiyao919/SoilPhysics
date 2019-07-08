@@ -9,8 +9,7 @@ from multiprocessing.pool import ThreadPool as Pool
 import traceback
 import time
 
-#* time setting *#
-dt = datetime.datetime
+#* Precipitation time setting *#
 class Precipitation(object):
     beginDate = ""
     beginDate_snortel=""
@@ -20,23 +19,15 @@ class Precipitation(object):
         self.beginDate_snortel=beginDate_snortel #Begin Date in Snortel Format
         self.beginDate_Meso=beginDate_Meso #Begin Date in MesoWest Format
 
-# * retrieving date *#
-startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
-startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
-starDate_Meso_str=str(startDate.strftime("%Y%m%d%H%M"))
-starDate_Snortel_str=str(startDate)
-PrecipitationPeriod = []
+
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
 delay_iutah=20
+header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
+         "Start Date", "Precipitation for 1 day", "Precipitation for 2 days", "Precipitation for 3 days", "Precipitation for 4 days", "Precipitation for 5 days",
+         "sm_2", "sm_4", "sm_8", "sm_20", "sm_40", "st_2", "st_4", "st_8", "st_20", "st_40"]]
+PrecipitationPeriod = []
 
-for i in range(0, NumberOfDays + 1):
-        tdelta = datetime.timedelta(days=i)
-        beginDate = str((startDate - tdelta).strftime("%Y-%m-%dT%H:%M"))
-        beginDate_snortel=str(startDate - tdelta)
-        beginDate_Meso= str((startDate - tdelta).strftime("%Y%m%d%H%M"))
-        dayPrecipitation = Precipitation(beginDate, beginDate_snortel, beginDate_Meso)
-        PrecipitationPeriod.append(dayPrecipitation) # adding all the dates needed for
 
 def isActive(x): #check if a station is still active or not
     # * time setting *#
@@ -45,9 +36,10 @@ def isActive(x): #check if a station is still active or not
     if dt.strptime(x.endDate, "%Y-%m-%d %H:%M:%S").date() > today.date():
         return True
 
-def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
+def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count, startDate):
     try:
         print('Start IUtah Station: {}'.format(i+1))
+        startDate_iutah_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
         # * retrieving info & parameters *#
         networkCode = 'iutah'
         PREC = 'Precip_Tot_Avg'  # Total Precipitation, cm
@@ -61,7 +53,7 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
 
         time.sleep(i * delay_iutah)
         #print('Thread {} access all sites'.format(i+1))
-        SiteObject = service.GetValuesForASiteObject(networkCode + ':' + siteCode, startDate_str, startDate_str)
+        SiteObject = service.GetValuesForASiteObject(networkCode + ':' + siteCode, startDate_iutah_str, startDate_iutah_str)
         #Site Info
         data_array_iUtah[i][1] = SiteObject.timeSeries[0].sourceInfo.siteName # site name
         data_array_iUtah[i][2] = siteCode  # site short name
@@ -133,7 +125,7 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count):
         print(traceback.format_exc())
 
 
-def getIUtahData(count):
+def getIUtahData(count, startDate):
     # Create a new object named "service_LoganRiver" for calling the web service methods
     wsdlURL = 'http://data.iutahepscor.org/loganriverwof/cuahsi_1_1.asmx?WSDL'
     service_LoganRiver = Client(wsdlURL).service
@@ -149,14 +141,14 @@ def getIUtahData(count):
 
     pool = Pool(processes=3)
     for i, validSite in enumerate(siteCodes):
-        pool.apply_async(getStationDataFromIUtah, (serviceArray, validSite, data_array_iUtah, i, count))
+        pool.apply_async(getStationDataFromIUtah, (serviceArray, validSite, data_array_iUtah, i, count, startDate))
         #getStationDataFromIUtah(serviceArray, validSite, data_array_iUtah, i, count)
     pool.close()
     pool.join()
 
     return data_array_iUtah
 
-def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, count):
+def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, count, startDate):
     try:
         print('Start Snortel Station: {}'.format(i+1))
         sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
@@ -164,6 +156,7 @@ def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, co
         sensor_PREC = r"PREC"  # PREC, PRECIPITATION ACCUMULATION, Inches
         sensor_SMS = r"SMS"  # SMS, SOIL MOISTURE PERCENT (Hourly), pct
         sensor_STO = r"STO"  # STO, SOIL TEMPERATURE OBSERVED, Fahrenheit
+        starDate_Snortel_str = str(startDate)
 
         data_array_snortel[i][0] = count + i  # serial number
         geo = awdb.service.getStationMetadata(validSite.stationTriplet)  # geo-information: elevation (ft), longtitude, altitude
@@ -250,7 +243,7 @@ def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, co
         print('Snortel Station {} Fail'.format(i+1))
         print(traceback.format_exc())
 
-def getSnortelData(count):
+def getSnortelData(count, startDate):
     # * AWDB (Air-Water Database) web service *#
     wsdl = r"https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
     awdb = Client(wsdl)
@@ -272,13 +265,13 @@ def getSnortelData(count):
 
     pool = Pool()
     for i, validSite in enumerate(meta):
-        pool.apply_async(getStationDataFromSnotel, (awdb, validSite, heights, data_array_snortel, i, count))
+        pool.apply_async(getStationDataFromSnotel, (awdb, validSite, heights, data_array_snortel, i, count, startDate))
     pool.close()
     pool.join()
 
     return data_array_snortel
 
-def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
+def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count, startDate):
     try:
         print('Start Scan Station: {}'.format(i+1))
         sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
@@ -286,6 +279,7 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
         sensor_PREC = r"PREC"  # PREC, PRECIPITATION ACCUMULATION, Inches
         sensor_SMS = r"SMS"  # SMS, SOIL MOISTURE PERCENT (Hourly), pct
         sensor_STO = r"STO"  # STO, SOIL TEMPERATURE OBSERVED, Fahrenheit
+        startDate_str = str(startDate)
 
         data_array_scan[i][0] = count + i  # serial number
         geo = awdb.service.getStationMetadata(validSite.stationTriplet)  # geo-information: elevation (ft), longtitude, altitude
@@ -297,7 +291,7 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
 
         # wind speed (mph) of the retrieved date
         wind_speed = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_WSPDV, 1, None,
-                                                       starDate_Snortel_str, starDate_Snortel_str, 'ALL',
+                                                       startDate_str, startDate_str, 'ALL',
                                                        'ENGLISH')
         data_array_scan[i][7] = -999999 if 'beginDate' not in wind_speed[0] or 'endDate' not in wind_speed[0] or \
                                            wind_speed[0].values[0] == "" or 'value' not in wind_speed[0].values[0] \
@@ -305,7 +299,7 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
 
         # air temperature (Fahrenheit) of the retrieved date
         air_temp = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_TOBS, 1, None,
-                                                     starDate_Snortel_str, starDate_Snortel_str, 'ALL',
+                                                     startDate_str, startDate_str, 'ALL',
                                                      'ENGLISH')
         data_array_scan[i][8] = -999999 if 'beginDate' not in air_temp[0] or 'endDate' not in air_temp[0] or \
                                            air_temp[0].values[0] == "" or 'value' not in air_temp[0].values[0] \
@@ -328,9 +322,9 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
         col_st = 20
         for height in [heights_2, heights_4, heights_8, heights_20, heights_40]:
             # soil moisture (pct)
-            sm = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_SMS, 1, height, starDate_Snortel_str, starDate_Snortel_str, 'ALL', 'ENGLISH')
+            sm = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_SMS, 1, height, startDate_str, startDate_str, 'ALL', 'ENGLISH')
             # soil temperature (Fahrenheit)
-            st = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_STO, 1, height, starDate_Snortel_str, starDate_Snortel_str, 'ALL', 'ENGLISH')
+            st = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_STO, 1, height, startDate_str, startDate_str, 'ALL', 'ENGLISH')
             data_array_scan[i][col_sm] = defaultValue if 'beginDate' not in sm[0] or 'endDate' not in sm[0] or \
                                                          sm[0].values[0] == "" or 'value' not in sm[0].values[0] \
                                                       else sm[0].values[0].value / 100  # sms, convert pct to decimal
@@ -341,7 +335,7 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
             col_st = col_st + 1
 
         prec = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_PREC, 1, None,
-                                                 starDate_Snortel_str, starDate_Snortel_str, 'ALL',
+                                                 startDate_str, startDate_str, 'ALL',
                                                  'ENGLISH')  # prec (inches) of the retrieved date
         data_array_scan[i][2] = prec[0].stationId  # station ID
         data_array_scan[i][9] = startDate
@@ -364,7 +358,7 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count):
         print(traceback.format_exc())
 
 
-def getScanData(count):
+def getScanData(count, startDate):
     wsdl = r"https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
     awdb = Client(wsdl)
     # * retrieving info & parameters *#
@@ -386,15 +380,16 @@ def getScanData(count):
 
     pool = Pool()
     for i, validSite in enumerate(meta):
-        pool.apply_async(getStationDataFromScan, (awdb, validSite, heights, data_array_scan, i, count))
+        pool.apply_async(getStationDataFromScan, (awdb, validSite, heights, data_array_scan, i, count, startDate))
     pool.close()
     pool.join()
 
     return data_array_scan
 
-def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count):
+def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count, startDate):
     try:
         print('Start MesoWest Station: {}'.format(i + 1))
+        starDate_Meso_str = str(startDate.strftime("%Y%m%d%H%M"))
         # * geo, wind_speed, and air temp info *#
         station_serialNo = i + count  # serial number
         station_name = validSite['NAME']  # station name
@@ -408,6 +403,7 @@ def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count):
         air_temp = r.timeseries(state='UT', stid=station_id, start=starDate_Meso_str, end=starDate_Meso_str,
                                 vars='air_temp')  # air temp  (Celsius) of the retrieved date
         station_air_temp = air_temp['STATION'][0]['OBSERVATIONS']['air_temp_set_1'][0]
+
 
         data_array_Meso[i][0] = station_serialNo  # serial number
         data_array_Meso[i][1] = station_name
@@ -490,9 +486,11 @@ def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count):
         print('MesoWest Station {} Fail'.format(i+1))
         print(traceback.format_exc())
 
-def getMesoWestData(count):
+def getMesoWestData(count, startDate):
     your_api_token = '2805d3f32c3446bbb7aef75f2d95dcae'  # my Mesowest API token#
     r = Meso(your_api_token)
+    starDate_Meso_str = str(startDate.strftime("%Y%m%d%H%M"))
+
     # * retrieve stations that have SMS measurement in UT in Mesowest *#
     data_sms = r.timeseries(state='UT', start=starDate_Meso_str, end=starDate_Meso_str, vars='soil_moisture')  # sms data (%) in UT (stid ='CLSPT': 3-depth sms;
     stations_sms = data_sms['STATION']  # list of stations which have sms data
@@ -513,69 +511,81 @@ def getMesoWestData(count):
 
     return data_array_Meso
 
+def run(start_date):
+    dt=datetime.datetime
+    startTime_all = dt.now()  # for counting program running time
+
+    SnortelArray_len = 0
+    ScanArray_len = 0
+    MesoWestArray_len = 0
+
+    startDate = dt.strptime(start_date, "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
+    startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
 
 
-startTime_all = dt.now()  # for counting program running time
-header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
-         "Start Date", "Precipitation for 1 day", "Precipitation for 2 days", "Precipitation for 3 days", "Precipitation for 4 days", "Precipitation for 5 days",
-         "sm_2", "sm_4", "sm_8", "sm_20", "sm_40", "st_2", "st_4", "st_8", "st_20", "st_40"]]
 
-SnortelArray_len = 0
-ScanArray_len = 0
-MesoWestArray_len = 0
+    for i in range(0, NumberOfDays + 1):
+            tdelta = datetime.timedelta(days=i)
+            beginDate = str((startDate - tdelta).strftime("%Y-%m-%dT%H:%M"))
+            beginDate_snortel=str(startDate - tdelta)
+            beginDate_Meso= str((startDate - tdelta).strftime("%Y%m%d%H%M"))
+            dayPrecipitation = Precipitation(beginDate, beginDate_snortel, beginDate_Meso)
+            PrecipitationPeriod.append(dayPrecipitation) # adding all the dates needed for
 
-# Data from Snortel Network
-startTime_sntl = dt.now()
-try:
-    SnortelArray=getSnortelData(1)
-    SnortelArray_len = len(SnortelArray)
-except:
-    print('The Snortel Network has been crashed down.')
-    SnortelArray = [['Snortel Fail.'] * 25]
-endTime_sntl = dt.now()
-print ("SNTL Time: %s" % (endTime_sntl - startTime_sntl))
+    # Data from Snortel Network
+    startTime_sntl = dt.now()
+    try:
+        SnortelArray=getSnortelData(1, startDate)
+        SnortelArray_len = len(SnortelArray)
+    except:
+        print('The Snortel Network has been crashed down.')
+        SnortelArray = [['Snortel Fail.'] * 25]
+    endTime_sntl = dt.now()
+    print ("SNTL Time: %s" % (endTime_sntl - startTime_sntl))
 
-#Data from Scan Network
-startTime_scan = dt.now()
-try:
-    ScanArray=getScanData(1+SnortelArray_len)
-    ScanArray_len=len(ScanArray)
-except:
-    print('The Scan Network has been crashed down.')
-    ScanArray = [['Scan Fail.'] * 25]
-endTime_scan = dt.now()
-print ("SCAN Time: %s" % (endTime_scan - startTime_scan))
+    #Data from Scan Network
+    startTime_scan = dt.now()
+    try:
+        ScanArray=getScanData(1+SnortelArray_len, startDate)
+        ScanArray_len=len(ScanArray)
+    except:
+        print('The Scan Network has been crashed down.')
+        ScanArray = [['Scan Fail.'] * 25]
+    endTime_scan = dt.now()
+    print ("SCAN Time: %s" % (endTime_scan - startTime_scan))
 
-#Data from MesoWest Network
-startTime_meso = dt.now()
-try:
-    MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len)
-    MesoWestArray_len=len(MesoWestArray)
-except:
-    print('The MesoWest Network has been crashed down.')
-    MesoWestArray=[['MesoWest Fail.']*25]
-endTime_meso = dt.now()
-print ("MESO Time: %s" % (endTime_meso - startTime_meso))
+    #Data from MesoWest Network
+    startTime_meso = dt.now()
+    try:
+        MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len, startDate)
+        MesoWestArray_len=len(MesoWestArray)
+    except:
+        print('The MesoWest Network has been crashed down.')
+        MesoWestArray=[['MesoWest Fail.']*25]
+    endTime_meso = dt.now()
+    print ("MESO Time: %s" % (endTime_meso - startTime_meso))
 
-#Data from IUtah Network
-startTime_iutah = dt.now()
-try:
-    IUtahArray=getIUtahData(1+SnortelArray_len+ScanArray_len+MesoWestArray_len)
-except:
-    print('The IUtah Network has been crashed down.')
-    IUtahArray=[['IUtah Fail.']*25]
-endTime_iutah = dt.now()
-print ("IUTAH Time: %s" % (endTime_iutah - startTime_iutah))
+    #Data from IUtah Network
+    startTime_iutah = dt.now()
+    try:
+        IUtahArray=getIUtahData(1+SnortelArray_len+ScanArray_len+MesoWestArray_len, startDate)
+    except:
+        print('The IUtah Network has been crashed down.')
+        IUtahArray=[['IUtah Fail.']*25]
+    endTime_iutah = dt.now()
+    print ("IUTAH Time: %s" % (endTime_iutah - startTime_iutah))
 
-#Combining data from all networks
-data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray, IUtahArray))
+    #Combining data from all networks
+    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray, IUtahArray))
 
-startDate_str=startDate_str.replace(":","-")
-with open('Parallel_'+startDate_str+'.csv','wb') as f: #write in csv file
-    writer = csv.writer(f)
-    writer.writerows(data_array)  # data summary
-endTime_all = dt.now()  #for counting program running time
-print ("Overall Time: %s" % (endTime_all - startTime_all)) #output run time
+    startDate_str=startDate_str.replace(":","-")
+    with open('Parallel_'+startDate_str+'.csv','wb') as f: #write in csv file
+        writer = csv.writer(f)
+        writer.writerows(data_array)  # data summary
+    endTime_all = dt.now()  #for counting program running time
+    print ("Overall Time: %s" % (endTime_all - startTime_all)) #output run time
+
+run("2017-09-25 00:00")
 
 
 
