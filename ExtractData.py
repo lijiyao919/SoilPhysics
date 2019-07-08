@@ -25,7 +25,6 @@ startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retriev
 startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
 starDate_Meso_str=str(startDate.strftime("%Y%m%d%H%M"))
 starDate_Snortel_str=str(startDate)
-endDate_str = startDate_str
 PrecipitationPeriod = []
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
