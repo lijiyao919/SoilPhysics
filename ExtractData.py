@@ -13,18 +13,12 @@ import time
 dt = datetime.datetime
 class Precipitation(object):
     beginDate = ""
-    endDate = ""
     beginDate_snortel=""
-    endDate_snortel=""
     beginDate_Meso=""
-    endDate_meso=""
-    def __init__(self, beginDate, endDate,beginDate_snortel,endDate_snortel,beginDate_Meso,endDate_meso):
+    def __init__(self, beginDate ,beginDate_snortel, beginDate_Meso):
         self.beginDate = beginDate
-        self.endDate = endDate
         self.beginDate_snortel=beginDate_snortel #Begin Date in Snortel Format
-        self.endDate_snortel=endDate_snortel #End Date in Snortel Format
         self.beginDate_Meso=beginDate_Meso #Begin Date in MesoWest Format
-        self.endDate_meso=endDate_meso #End Date in Mesowest Format
 
 # * retrieving date *#
 startDate = dt.strptime("2017-09-25 00:00", "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
@@ -40,12 +34,9 @@ delay_iutah=20
 for i in range(0, NumberOfDays + 1):
         tdelta = datetime.timedelta(days=i)
         beginDate = str((startDate - tdelta).strftime("%Y-%m-%dT%H:%M"))
-        endDate = beginDate
         beginDate_snortel=str(startDate - tdelta)
         beginDate_Meso= str((startDate - tdelta).strftime("%Y%m%d%H%M"))
-        endDate_meso=beginDate_Meso
-        endDate_snortel=beginDate_snortel
-        dayPrecipitation = Precipitation(beginDate, endDate,beginDate_snortel,endDate_snortel,beginDate_Meso,endDate_meso)
+        dayPrecipitation = Precipitation(beginDate, beginDate_snortel, beginDate_Meso)
         PrecipitationPeriod.append(dayPrecipitation) # adding all the dates needed for
 
 def isActive(x): #check if a station is still active or not
