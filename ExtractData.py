@@ -505,7 +505,7 @@ def getMesoWestData(count, startDate):
 
     pool = Pool()
     for i, validSite in enumerate(validSite_sms):
-        pool.apply_async(getStationDataFromMesoWest, (r, validSite, data_array_Meso, i, count))
+        pool.apply_async(getStationDataFromMesoWest, (r, validSite, data_array_Meso, i, count, startDate))
     pool.close()
     pool.join()
 
