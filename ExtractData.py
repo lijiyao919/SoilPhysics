@@ -38,7 +38,7 @@ def isActive(x): #check if a station is still active or not
 
 def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count, startDate):
     try:
-        print('Start IUtah Station: {}'.format(i+1))
+        #print('Start IUtah Station: {}'.format(i+1))
         startDate_iutah_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
         # * retrieving info & parameters *#
         networkCode = 'iutah'
@@ -114,14 +114,14 @@ def getStationDataFromIUtah(serviceArray, siteCode, data_array_iUtah, i, count, 
                                                               float(prec) < float(dayPrecipitate.timeSeries[0].values[0].value[0].value) \
                                                            else round((float(prec) - float(dayPrecipitate.timeSeries[0].values[0].value[0].value)) * 10, 4)
 
-        print('---Finish IUtah Station: {}'.format(i + 1))
+        #print('---Finish IUtah Station: {}'.format(i + 1))
         '''print (data_array_iUtah[i][0],data_array_iUtah[i][1],data_array_iUtah[i][2],data_array_iUtah[i][3],data_array_iUtah[i][4],
                data_array_iUtah[i][5],data_array_iUtah[i][6],data_array_iUtah[i][7],data_array_iUtah[i][8], data_array_iUtah[i][9],
                data_array_iUtah[i][10], data_array_iUtah[i][11], data_array_iUtah[i][12], data_array_iUtah[i][13], data_array_iUtah[i][14],
                data_array_iUtah[i][15], data_array_iUtah[i][16], data_array_iUtah[i][17], data_array_iUtah[i][18], data_array_iUtah[i][19],
                data_array_iUtah[i][20], data_array_iUtah[i][21], data_array_iUtah[i][22], data_array_iUtah[i][23],data_array_iUtah[i][24])'''
     except Exception as e:
-        print('IUtah Station {} Fail'.format(i+1))
+        print('{} IUtah Station {} Fail'.format(startDate, i+1))
         print(traceback.format_exc())
 
 
@@ -150,7 +150,7 @@ def getIUtahData(count, startDate):
 
 def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, count, startDate):
     try:
-        print('Start Snortel Station: {}'.format(i+1))
+        #print('Start Snortel Station: {}'.format(i+1))
         sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
         sensor_TOBS = r"TOBS"  # TOBS, AIR TEMPERATURE OBSERVED, Fahrenheit
         sensor_PREC = r"PREC"  # PREC, PRECIPITATION ACCUMULATION, Inches
@@ -234,13 +234,13 @@ def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, co
                                                             'values' not in prec[0] or \
                                                             prec[0].values[0].value < dayPrecipitate[0].values[0].value \
                                                          else 25.4 * (prec[0].values[0].value - dayPrecipitate[0].values[0].value)
-        print('---Finish Snorel Station: {}'.format(i+1))
+        #print('---Finish Snorel Station: {}'.format(i+1))
         '''print (data_array_snortel[i][0], data_array_snortel[i][1], data_array_snortel[i][2], data_array_snortel[i][3], data_array_snortel[i][4], data_array_snortel[i][5],
                data_array_snortel[i][6], data_array_snortel[i][7], data_array_snortel[i][8], data_array_snortel[i][9], data_array_snortel[i][10], data_array_snortel[i][11],
                data_array_snortel[i][12], data_array_snortel[i][13], data_array_snortel[i][14], data_array_snortel[i][15], data_array_snortel[i][16], data_array_snortel[i][17],
                data_array_snortel[i][18], data_array_snortel[i][19], data_array_snortel[i][20], data_array_snortel[i][21], data_array_snortel[i][22], data_array_snortel[i][23],data_array_snortel[i][24])'''
     except Exception as e:
-        print('Snortel Station {} Fail'.format(i+1))
+        print('{} Snortel Station {} Fail'.format(startDate, i+1))
         print(traceback.format_exc())
 
 def getSnortelData(count, startDate):
@@ -273,7 +273,7 @@ def getSnortelData(count, startDate):
 
 def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count, startDate):
     try:
-        print('Start Scan Station: {}'.format(i+1))
+        #print('Start Scan Station: {}'.format(i+1))
         sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
         sensor_TOBS = r"TOBS"  # TOBS, AIR TEMPERATURE OBSERVED, Fahrenheit
         sensor_PREC = r"PREC"  # PREC, PRECIPITATION ACCUMULATION, Inches
@@ -348,13 +348,13 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count, 
                                                          'beginDate' not in prec[0] or 'endDate' not in prec[0] or \
                                                           prec[0].values[0].value < dayPrecipitate[0].values[0].value \
                                                       else 25.4 * (prec[0].values[0].value - dayPrecipitate[0].values[0].value)
-        print('---Finish Scan Station: {}'.format(i + 1))
+        #print('---Finish Scan Station: {}'.format(i + 1))
         '''print (data_array_scan[i][0], data_array_scan[i][1], data_array_scan[i][2], data_array_scan[i][3], data_array_scan[i][4], data_array_scan[i][5],
                data_array_scan[i][6], data_array_scan[i][7], data_array_scan[i][8], data_array_scan[i][9], data_array_scan[i][10], data_array_scan[i][11],
                data_array_scan[i][12], data_array_scan[i][13], data_array_scan[i][14], data_array_scan[i][15], data_array_scan[i][16], data_array_scan[i][17],
                data_array_scan[i][18], data_array_scan[i][19], data_array_scan[i][20], data_array_scan[i][21], data_array_scan[i][22], data_array_scan[i][23])'''
     except Exception as e:
-        print('Scan Station {} Fail'.format(i+1))
+        print('{} Scan Station {} Fail'.format(startDate, i+1))
         print(traceback.format_exc())
 
 
@@ -388,7 +388,7 @@ def getScanData(count, startDate):
 
 def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count, startDate):
     try:
-        print('Start MesoWest Station: {}'.format(i + 1))
+        #print('Start MesoWest Station: {}'.format(i + 1))
         starDate_Meso_str = str(startDate.strftime("%Y%m%d%H%M"))
         # * geo, wind_speed, and air temp info *#
         station_serialNo = i + count  # serial number
@@ -475,7 +475,7 @@ def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count, startDat
                 sto_observation_1 = sto_observations['soil_temp_set_1'][0]
                 data_array_Meso[i][21] = sto_observation_1  # sms at the 1st depth
 
-        print('---Finish MesoWest Station: {}'.format(i + 1))
+        #print('---Finish MesoWest Station: {}'.format(i + 1))
         '''if num_sms_positions == 1 and num_sto_positions == 1:
             print(data_array_Meso[i][0], data_array_Meso[i][1], data_array_Meso[i][2], data_array_Meso[i][3], data_array_Meso[i][4], data_array_Meso[i][5], 
                    data_array_Meso[i][6], data_array_Meso[i][7], data_array_Meso[i][8], data_array_Meso[i][9], data_array_Meso[i][10], data_array_Meso[i][11], 
@@ -483,7 +483,7 @@ def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count, startDat
                    data_array_Meso[i][17], data_array_Meso[i][18], data_array_Meso[i][19], data_array_Meso[i][20], data_array_Meso[i][21],
                    data_array_Meso[i][22], data_array_Meso[i][23])'''
     except Exception as e:
-        print('MesoWest Station {} Fail'.format(i+1))
+        print('{} MesoWest Station {} Fail'.format(startDate, i+1))
         print(traceback.format_exc())
 
 def getMesoWestData(count, startDate):
@@ -534,6 +534,7 @@ def run(start_date):
 
     # Data from Snortel Network
     startTime_sntl = dt.now()
+    print('Retrieve data from Snortel on {}'.format(startDate))
     try:
         SnortelArray=getSnortelData(1, startDate)
         SnortelArray_len = len(SnortelArray)
@@ -541,10 +542,11 @@ def run(start_date):
         print('The Snortel Network has been crashed down.')
         SnortelArray = [['Snortel Fail.'] * 25]
     endTime_sntl = dt.now()
-    print ("SNTL Time: %s" % (endTime_sntl - startTime_sntl))
+    print ("SNTL Time on %s: %s" %(startDate, (endTime_sntl - startTime_sntl)))
 
     #Data from Scan Network
     startTime_scan = dt.now()
+    print('Retrieve data from Scan on {}'.format(startDate))
     try:
         ScanArray=getScanData(1+SnortelArray_len, startDate)
         ScanArray_len=len(ScanArray)
@@ -552,10 +554,11 @@ def run(start_date):
         print('The Scan Network has been crashed down.')
         ScanArray = [['Scan Fail.'] * 25]
     endTime_scan = dt.now()
-    print ("SCAN Time: %s" % (endTime_scan - startTime_scan))
+    print ("SCAN Time on %s: %s" % (startDate, (endTime_scan - startTime_scan)))
 
     #Data from MesoWest Network
     startTime_meso = dt.now()
+    print('Retrieve data from Mesowest on {}'.format(startDate))
     try:
         MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len, startDate)
         MesoWestArray_len=len(MesoWestArray)
@@ -563,17 +566,18 @@ def run(start_date):
         print('The MesoWest Network has been crashed down.')
         MesoWestArray=[['MesoWest Fail.']*25]
     endTime_meso = dt.now()
-    print ("MESO Time: %s" % (endTime_meso - startTime_meso))
+    print ("MESO Time on %s: %s" % (startDate, (endTime_meso - startTime_meso)))
 
     #Data from IUtah Network
     startTime_iutah = dt.now()
+    print('Retrieve data from IUtah on {}'.format(startDate))
     try:
         IUtahArray=getIUtahData(1+SnortelArray_len+ScanArray_len+MesoWestArray_len, startDate)
     except:
         print('The IUtah Network has been crashed down.')
         IUtahArray=[['IUtah Fail.']*25]
     endTime_iutah = dt.now()
-    print ("IUTAH Time: %s" % (endTime_iutah - startTime_iutah))
+    print ("IUTAH Time on %s: %s" % (startDate, (endTime_iutah - startTime_iutah)))
 
     #Combining data from all networks
     data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray, IUtahArray))
@@ -583,7 +587,7 @@ def run(start_date):
         writer = csv.writer(f)
         writer.writerows(data_array)  # data summary
     endTime_all = dt.now()  #for counting program running time
-    print ("Overall Time: %s" % (endTime_all - startTime_all)) #output run time
+    print ("Overall Time on %s: %s" % (startDate, (endTime_all - startTime_all))) #output run time
 
 run("2017-09-25 00:00")
 
