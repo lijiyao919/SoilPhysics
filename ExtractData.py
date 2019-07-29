@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 from MesoPy import *
 from multiprocessing.pool import ThreadPool as Pool
+import multiprocessing as mp
 import traceback
 import time
 
@@ -19,14 +20,20 @@ class Precipitation(object):
         self.beginDate_snortel=beginDate_snortel #Begin Date in Snortel Format
         self.beginDate_Meso=beginDate_Meso #Begin Date in MesoWest Format
 
-
-NumberOfDays = 5 # Number of days precipitation accumulation is needed
-defaultValue=-999999 # says value is missing or abnormal
-delay_iutah=20
 header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
          "Start Date", "Precipitation for 1 day", "Precipitation for 2 days", "Precipitation for 3 days", "Precipitation for 4 days", "Precipitation for 5 days",
          "sm_2", "sm_4", "sm_8", "sm_20", "sm_40", "st_2", "st_4", "st_8", "st_20", "st_40"]]
+NumberOfDays = 5 # Number of days precipitation accumulation is needed
 PrecipitationPeriod = []
+defaultValue=-999999 # says value is missing or abnormal
+delay_iutah=20
+snortel_thread_num = 8
+scan_thread_num = 8
+meso_thread_num = 8
+iutah_thread_num = 3
+proc_num =8
+
+
 
 
 def isActive(x): #check if a station is still active or not
@@ -139,7 +146,7 @@ def getIUtahData(count, startDate):
     serviceArray = [service_LoganRiver, service_Rebutte]
     data_array_iUtah = [[None] * 25 for row in range(num_sites)]
 
-    pool = Pool(processes=3)
+    pool = Pool(processes=iutah_thread_num)
     for i, validSite in enumerate(siteCodes):
         pool.apply_async(getStationDataFromIUtah, (serviceArray, validSite, data_array_iUtah, i, count, startDate))
         #getStationDataFromIUtah(serviceArray, validSite, data_array_iUtah, i, count)
@@ -263,7 +270,7 @@ def getSnortelData(count, startDate):
     # * a data array for storing retrieved data *#
     data_array_snortel = [[None]*25 for row in range(num_stations_validate)]  # a data array for storing retrieved data
 
-    pool = Pool()
+    pool = Pool(processes=snortel_thread_num)
     for i, validSite in enumerate(meta):
         pool.apply_async(getStationDataFromSnotel, (awdb, validSite, heights, data_array_snortel, i, count, startDate))
     pool.close()
@@ -378,7 +385,7 @@ def getScanData(count, startDate):
     # * a data array for storing retrieved data *#
     data_array_scan = [[None]*25 for row in range(num_stations_validate)]  # a data array for storing retrieved data
 
-    pool = Pool()
+    pool = Pool(processes=scan_thread_num)
     for i, validSite in enumerate(meta):
         pool.apply_async(getStationDataFromScan, (awdb, validSite, heights, data_array_scan, i, count, startDate))
     pool.close()
@@ -503,7 +510,7 @@ def getMesoWestData(count, startDate):
     # * a data array for storing retrieved data *#
     data_array_Meso = [[None]*25 for row in range(num_validSite)]
 
-    pool = Pool()
+    pool = Pool(processes=meso_thread_num)
     for i, validSite in enumerate(validSite_sms):
         pool.apply_async(getStationDataFromMesoWest, (r, validSite, data_array_Meso, i, count, startDate))
     pool.close()
@@ -521,8 +528,7 @@ def run(start_date):
 
     startDate = dt.strptime(start_date, "%Y-%m-%d %H:%M")  # date to retrieve soil moisture and precipitation
     startDate_str = str(startDate.strftime("%Y-%m-%dT%H:%M"))
-
-
+    startDate_print = str(startDate.strftime("%Y-%m-%d"))
 
     for i in range(0, NumberOfDays + 1):
             tdelta = datetime.timedelta(days=i)
@@ -534,7 +540,7 @@ def run(start_date):
 
     # Data from Snortel Network
     startTime_sntl = dt.now()
-    print('Retrieve data from Snortel on {}'.format(startDate))
+    print('Retrieve data from Snortel on {}'.format(startDate_print))
     try:
         SnortelArray=getSnortelData(1, startDate)
         SnortelArray_len = len(SnortelArray)
@@ -542,11 +548,11 @@ def run(start_date):
         print('The Snortel Network has been crashed down.')
         SnortelArray = [['Snortel Fail.'] * 25]
     endTime_sntl = dt.now()
-    print ("SNTL Time on %s: %s" %(startDate, (endTime_sntl - startTime_sntl)))
+    print ("SNTL Time on %s is: %s" %(startDate_print, (endTime_sntl - startTime_sntl)))
 
     #Data from Scan Network
     startTime_scan = dt.now()
-    print('Retrieve data from Scan on {}'.format(startDate))
+    print('Retrieve data from Scan on {}'.format(startDate_print))
     try:
         ScanArray=getScanData(1+SnortelArray_len, startDate)
         ScanArray_len=len(ScanArray)
@@ -554,11 +560,11 @@ def run(start_date):
         print('The Scan Network has been crashed down.')
         ScanArray = [['Scan Fail.'] * 25]
     endTime_scan = dt.now()
-    print ("SCAN Time on %s: %s" % (startDate, (endTime_scan - startTime_scan)))
+    print ("SCAN Time on %s is: %s" % (startDate_print, (endTime_scan - startTime_scan)))
 
     #Data from MesoWest Network
     startTime_meso = dt.now()
-    print('Retrieve data from Mesowest on {}'.format(startDate))
+    print('Retrieve data from Mesowest on {}'.format(startDate_print))
     try:
         MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len, startDate)
         MesoWestArray_len=len(MesoWestArray)
@@ -566,10 +572,10 @@ def run(start_date):
         print('The MesoWest Network has been crashed down.')
         MesoWestArray=[['MesoWest Fail.']*25]
     endTime_meso = dt.now()
-    print ("MESO Time on %s: %s" % (startDate, (endTime_meso - startTime_meso)))
+    print ("MESO Time on %s is: %s" % (startDate_print, (endTime_meso - startTime_meso)))
 
     #Data from IUtah Network
-    startTime_iutah = dt.now()
+    '''startTime_iutah = dt.now()
     print('Retrieve data from IUtah on {}'.format(startDate))
     try:
         IUtahArray=getIUtahData(1+SnortelArray_len+ScanArray_len+MesoWestArray_len, startDate)
@@ -577,19 +583,39 @@ def run(start_date):
         print('The IUtah Network has been crashed down.')
         IUtahArray=[['IUtah Fail.']*25]
     endTime_iutah = dt.now()
-    print ("IUTAH Time on %s: %s" % (startDate, (endTime_iutah - startTime_iutah)))
+    print ("IUTAH Time on %s: %s" % (startDate, (endTime_iutah - startTime_iutah)))'''
 
     #Combining data from all networks
-    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray, IUtahArray))
+    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray))
 
     startDate_str=startDate_str.replace(":","-")
     with open('Parallel_'+startDate_str+'.csv','wb') as f: #write in csv file
         writer = csv.writer(f)
         writer.writerows(data_array)  # data summary
     endTime_all = dt.now()  #for counting program running time
-    print ("Overall Time on %s: %s" % (startDate, (endTime_all - startTime_all))) #output run time
+    print ("Overall Time on %s is: %s" % (startDate_print, (endTime_all - startTime_all))) #output run time
 
-run("2017-09-25 00:00")
+if __name__ == '__main__':
+    #run("2017-09-25 00:00")
+    dt=datetime.datetime
+    run_start = dt.now()
+    start_day = datetime.datetime(2017,9,1)
+    end_day = datetime.datetime(2017,9,30)
+    delta_day = datetime.timedelta(days = 1)
+    dates=[]
+    while start_day <= end_day:
+        day = start_day.strftime("%Y-%m-%d %H:%M")
+        dates.append(day)
+        start_day+=delta_day
+    print(dates)
+
+    pool = mp.Pool(processes=proc_num)
+    pool.map(run, dates)
+    pool.close()
+    pool.join()
+    run_end=dt.now()
+    print('Overall Time: %s' % (run_end-run_start))
+
 
 
 
