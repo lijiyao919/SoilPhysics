@@ -26,14 +26,17 @@ header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(me
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 PrecipitationPeriod = []
 defaultValue=-999999 # says value is missing or abnormal
+snortel_fail=[]
+scan_fail=[]
+meso_fail=[]
+
+
 delay_iutah=20
 snortel_thread_num = 8
 scan_thread_num = 8
 meso_thread_num = 8
 iutah_thread_num = 3
 proc_num =8
-
-
 
 
 def isActive(x): #check if a station is still active or not
@@ -248,7 +251,8 @@ def getStationDataFromSnotel(awdb, validSite, heights, data_array_snortel, i, co
                data_array_snortel[i][18], data_array_snortel[i][19], data_array_snortel[i][20], data_array_snortel[i][21], data_array_snortel[i][22], data_array_snortel[i][23],data_array_snortel[i][24])'''
     except Exception as e:
         print('{} Snortel Station {} Fail'.format(startDate, i+1))
-        print(traceback.format_exc())
+        snortel_fail.append((i, validSite))
+        #print(traceback.format_exc())
 
 def getSnortelData(count, startDate):
     # * AWDB (Air-Water Database) web service *#
@@ -275,6 +279,16 @@ def getSnortelData(count, startDate):
         pool.apply_async(getStationDataFromSnotel, (awdb, validSite, heights, data_array_snortel, i, count, startDate))
     pool.close()
     pool.join()
+
+    error_try=len(snortel_fail)
+    while len(snortel_fail) != 0:
+        elem = snortel_fail.pop(0)
+        error_try = error_try - 1
+        print('SNTL: Retry Station {} on {}'.format(elem[0]+1, startDate))
+        getStationDataFromSnotel(awdb, elem[1], heights, data_array_snortel, elem[0], count, startDate)
+        if error_try < 0:
+            print('SNTL: Give up trying on {}'.format(startDate))
+            break
 
     return data_array_snortel
 
@@ -361,8 +375,9 @@ def getStationDataFromScan(awdb, validSite, heights, data_array_scan, i, count, 
                data_array_scan[i][12], data_array_scan[i][13], data_array_scan[i][14], data_array_scan[i][15], data_array_scan[i][16], data_array_scan[i][17],
                data_array_scan[i][18], data_array_scan[i][19], data_array_scan[i][20], data_array_scan[i][21], data_array_scan[i][22], data_array_scan[i][23])'''
     except Exception as e:
-        print('{} Scan Station {} Fail'.format(startDate, i+1))
-        print(traceback.format_exc())
+        print('{} Scan Station {} Fail'.format(startDate, i + 1))
+        scan_fail.append((i, validSite))
+        #print(traceback.format_exc())
 
 
 def getScanData(count, startDate):
@@ -390,6 +405,16 @@ def getScanData(count, startDate):
         pool.apply_async(getStationDataFromScan, (awdb, validSite, heights, data_array_scan, i, count, startDate))
     pool.close()
     pool.join()
+
+    error_try = len(scan_fail)
+    while len(scan_fail) != 0:
+        elem = scan_fail.pop(0)
+        error_try = error_try - 1
+        print('Scan: Retry Station {} on {}'.format(elem[0]+1, startDate))
+        getStationDataFromScan(awdb, elem[1], heights, data_array_scan, elem[0], count, startDate)
+        if error_try < 0:
+            print('Scan: Give up trying {}'.format(startDate))
+            break
 
     return data_array_scan
 
@@ -491,7 +516,8 @@ def getStationDataFromMesoWest(r, validSite, data_array_Meso, i, count, startDat
                    data_array_Meso[i][22], data_array_Meso[i][23])'''
     except Exception as e:
         print('{} MesoWest Station {} Fail'.format(startDate, i+1))
-        print(traceback.format_exc())
+        meso_fail.append((i, validSite))
+        #print(traceback.format_exc())
 
 def getMesoWestData(count, startDate):
     your_api_token = '2805d3f32c3446bbb7aef75f2d95dcae'  # my Mesowest API token#
@@ -515,6 +541,16 @@ def getMesoWestData(count, startDate):
         pool.apply_async(getStationDataFromMesoWest, (r, validSite, data_array_Meso, i, count, startDate))
     pool.close()
     pool.join()
+
+    error_try = len(meso_fail)
+    while len(meso_fail) != 0:
+        elem = meso_fail.pop(0)
+        error_try = error_try - 1
+        print('MESO: Retry Station {} on {}'.format(elem[0] + 1, startDate))
+        getStationDataFromSnotel(r, elem[1], data_array_Meso, elem[0], count, startDate)
+        if error_try < 0:
+            print('MESO: Give up on {}'.format(startDate))
+            break
 
     return data_array_Meso
 
@@ -540,7 +576,7 @@ def run(start_date):
 
     # Data from Snortel Network
     startTime_sntl = dt.now()
-    print('Retrieve data from Snortel on {}'.format(startDate_print))
+    #print('Retrieve data from Snortel on {}'.format(startDate_print))
     try:
         SnortelArray=getSnortelData(1, startDate)
         SnortelArray_len = len(SnortelArray)
@@ -548,11 +584,11 @@ def run(start_date):
         print('The Snortel Network has been crashed down.')
         SnortelArray = [['Snortel Fail.'] * 25]
     endTime_sntl = dt.now()
-    print ("SNTL Time on %s is: %s" %(startDate_print, (endTime_sntl - startTime_sntl)))
+    #print ("SNTL Time on %s is: %s" %(startDate_print, (endTime_sntl - startTime_sntl)))
 
     #Data from Scan Network
     startTime_scan = dt.now()
-    print('Retrieve data from Scan on {}'.format(startDate_print))
+    #print('Retrieve data from Scan on {}'.format(startDate_print))
     try:
         ScanArray=getScanData(1+SnortelArray_len, startDate)
         ScanArray_len=len(ScanArray)
@@ -560,11 +596,11 @@ def run(start_date):
         print('The Scan Network has been crashed down.')
         ScanArray = [['Scan Fail.'] * 25]
     endTime_scan = dt.now()
-    print ("SCAN Time on %s is: %s" % (startDate_print, (endTime_scan - startTime_scan)))
+    #print ("SCAN Time on %s is: %s" % (startDate_print, (endTime_scan - startTime_scan)))
 
     #Data from MesoWest Network
     startTime_meso = dt.now()
-    print('Retrieve data from Mesowest on {}'.format(startDate_print))
+    #print('Retrieve data from Mesowest on {}'.format(startDate_print))
     try:
         MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len, startDate)
         MesoWestArray_len=len(MesoWestArray)
@@ -572,7 +608,7 @@ def run(start_date):
         print('The MesoWest Network has been crashed down.')
         MesoWestArray=[['MesoWest Fail.']*25]
     endTime_meso = dt.now()
-    print ("MESO Time on %s is: %s" % (startDate_print, (endTime_meso - startTime_meso)))
+    #print ("MESO Time on %s is: %s" % (startDate_print, (endTime_meso - startTime_meso)))
 
     #Data from IUtah Network
     '''startTime_iutah = dt.now()
@@ -593,7 +629,7 @@ def run(start_date):
         writer = csv.writer(f)
         writer.writerows(data_array)  # data summary
     endTime_all = dt.now()  #for counting program running time
-    print ("Overall Time on %s is: %s" % (startDate_print, (endTime_all - startTime_all))) #output run time
+    #print ("Overall Time on %s is: %s" % (startDate_print, (endTime_all - startTime_all))) #output run time
 
 if __name__ == '__main__':
     #run("2017-09-25 00:00")
