@@ -601,13 +601,13 @@ def run(start_date):
     #Data from MesoWest Network
     startTime_meso = dt.now()
     #print('Retrieve data from Mesowest on {}'.format(startDate_print))
-    try:
+    '''try:
         MesoWestArray=getMesoWestData(1+SnortelArray_len+ScanArray_len, startDate)
         MesoWestArray_len=len(MesoWestArray)
     except:
         print('The MesoWest Network has been crashed down.')
         MesoWestArray=[['MesoWest Fail.']*25]
-    endTime_meso = dt.now()
+    endTime_meso = dt.now()'''
     #print ("MESO Time on %s is: %s" % (startDate_print, (endTime_meso - startTime_meso)))
 
     #Data from IUtah Network
@@ -622,12 +622,12 @@ def run(start_date):
     print ("IUTAH Time on %s: %s" % (startDate, (endTime_iutah - startTime_iutah)))'''
 
     #Combining data from all networks
-    data_array = np.vstack((header, SnortelArray, ScanArray, MesoWestArray))
+    data_array = np.vstack((header, SnortelArray, ScanArray))
 
     startDate_str=startDate_str.replace(":","-")
-    with open('Parallel_'+startDate_str+'.csv','wb') as f: #write in csv file
+    with open('Soil_'+startDate_str+'.csv', 'w', newline='') as f: #should be wb if python2.7
         writer = csv.writer(f)
-        writer.writerows(data_array)  # data summary
+        writer.writerows(data_array) 
     endTime_all = dt.now()  #for counting program running time
     #print ("Overall Time on %s is: %s" % (startDate_print, (endTime_all - startTime_all))) #output run time
 
@@ -635,8 +635,8 @@ if __name__ == '__main__':
     #run("2017-09-25 00:00")
     dt=datetime.datetime
     run_start = dt.now()
-    start_day = datetime.datetime(2017,9,1)
-    end_day = datetime.datetime(2017,9,30)
+    start_day = datetime.datetime(2017,9,25)
+    end_day = datetime.datetime(2017,9,25)
     delta_day = datetime.timedelta(days = 1)
     dates=[]
     while start_day <= end_day:
