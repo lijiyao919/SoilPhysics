@@ -7,13 +7,16 @@ import numpy as np
 from multiprocessing.pool import ThreadPool as Pool
 import multiprocessing as mp
 import traceback
+import urllib3
+from bs4 import BeautifulSoup #helps to beautify the returned code (optional)
+import json
 
 
 dt=datetime.datetime
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
 nrcs_thread_num = 8
-proc_num =8
+proc_num =1
 nrcs_fail=[]
 PrecipitationPeriod = []
 header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
@@ -171,6 +174,53 @@ def getNRCSData(count, startDate, ntwk):
 
     return data_array_nrcs
 
+def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
+    endDate = startDate + datetime.timedelta(days=1)
+    startDate_str = startDate.strftime("%Y-%m-%d")
+    endDate_str = endDate.strftime("%Y-%m-%d")
+    url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=m'.format(ntwk,id,startDate,endDate)
+
+    http = urllib3.PoolManager()
+    response = http.request('GET', url)
+    soup = BeautifulSoup(response.data.decode('utf-8'), "html.parser")
+    station = json.loads(str(soup))
+    print(station)
+
+
+
+def getUCCData(count, startDate, ntwk):
+    stations=[]
+    url = "https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/source=UCC/network={}".format(ntwk)
+    http = urllib3.PoolManager()
+    response = http.request('GET', url)
+    soup = BeautifulSoup(response.data.decode('utf-8'), "html.parser")
+    stationsInfo = json.loads(str(soup))
+
+    #Extract station
+    for elem in stationsInfo['payload']:
+        if elem['state'] != 'UT' or elem['country'] != 'US':
+            continue
+        stationID = elem['station_id']
+        stationName = elem['name']
+        elevation = elem['elevation']
+        latitude = elem['latitude']
+        longitude = elem['longitude']
+        stations.append((stationID, stationName, elevation, latitude, longitude))
+
+    data_array_ucc = [[defaultValue] * 25 for row in range(len(stations))]
+
+    i=0
+    for id, name, elev, lat, long in stations:
+        #print(id, name, elev)
+        data_array_ucc[i][0] = count + i  # serial number
+        data_array_ucc[i][1] = name  # station name
+        data_array_ucc[i][2] = id
+        data_array_ucc[i][3] = ntwk
+        data_array_ucc[i][4] = elev
+        data_array_ucc[i][5] = lat  # latitude
+        data_array_ucc[i][6] = long  # longitude
+        getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc)
+        i+=1
 
 def run(start_date_time):
     SNTLArray = [[defaultValue]*25]
@@ -188,28 +238,31 @@ def run(start_date_time):
             PrecipitationPeriod.append(precipitation_date) # adding all the dates needed for
 
     # Data from Snotel Network
-    startTime_SNTL = dt.now()
+    #startTime_SNTL = dt.now()
     #print('Retrieve data from SNTL on {}'.format(startDate_print))
-    try:
+    '''try:
         SNTLArray = getNRCSData(1, start_date_time, 'SNTL')
         SNTLArray_len = len(SNTLArray)
     except:
         print('The SNTL Network has been crashed down: {}.'.format(start_date_str))
-        print(traceback.format_exc())
-    endTime_SNTL = dt.now()
+        print(traceback.format_exc())'''
+    #endTime_SNTL = dt.now()
     #print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
 
     #Data from Scan Network
-    startTime_SCAN = dt.now()
+    #startTime_SCAN = dt.now()
     #print('Retrieve data from SCAN on {}'.format(startDate_print))
-    try:
+    '''try:
         SCANArray=getNRCSData(1+SNTLArray_len, start_date_time, 'SCAN')
         SCANArray_len=len(SCANArray)
     except:
         print('The SCAN Network has been crashed down: {}.'.format(start_date_str))
-        print(traceback.format_exc())
-    endTime_SCAN = dt.now()
+        print(traceback.format_exc())'''
+    #endTime_SCAN = dt.now()
     #print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
+
+    #Data from UAGRIMET
+    getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET')
 
     #Combining data from all networks
     data_array = np.vstack((header, SNTLArray, SCANArray))
@@ -222,8 +275,8 @@ def run(start_date_time):
 if __name__ == '__main__':
     run_start = dt.now()
     #Specify date
-    start_date_time = datetime.datetime(2017, 9, 1)
-    end_date_time = datetime.datetime(2017, 9, 30)
+    start_date_time = datetime.datetime(2017, 9, 25)
+    end_date_time = datetime.datetime(2017, 9, 25)
     delta_date = datetime.timedelta(days = 1)
     date_time_list=[]
     while start_date_time <= end_date_time:
