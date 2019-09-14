@@ -178,14 +178,43 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
     endDate = startDate + datetime.timedelta(days=1)
     startDate_str = startDate.strftime("%Y-%m-%d")
     endDate_str = endDate.strftime("%Y-%m-%d")
-    url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=m'.format(ntwk,id,startDate,endDate)
-
+    url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=english'.format(ntwk,id,startDate,endDate)
     http = urllib3.PoolManager()
     response = http.request('GET', url)
     soup = BeautifulSoup(response.data.decode('utf-8'), "html.parser")
     station = json.loads(str(soup))
     print(station)
+    if station['payload'] != False:
+        station = station['payload'][0]
+    else:
+        return 0
 
+
+    if ntwk == 'UCRN':
+        data_array_ucc[i][7] = 0.44704 * float(station['winds'])  # wind_speed, convert mph to m/s
+        data_array_ucc[i][8] = (float(station['airt']) - 32) * 5 / 9  # air temp, convert Fahrenheit to Celsius
+    else:
+        data_array_ucc[i][7] = 0.44704 * float(station['winds_avg'])  # wind_speed, convert mph to m/s
+        data_array_ucc[i][8] = (float(station['airt_avg']) - 32) * 5 / 9  # air temp, convert Fahrenheit to Celsius
+    data_array_ucc[i][9] = startDate
+
+    #prep
+    if ntwk == 'AGWX':
+        data_array_ucc[i][10] = station['precip_tb']
+    else:
+        data_array_ucc[i][10] = station['precip']
+
+    #mositure
+    if ntwk == 'AGWX':
+        data_array_ucc[i][17] = defaultValue if station['soilvwc8_avg'] is None \
+                                             else float(station['soilvwc8_avg']) / 100
+
+    #temperature
+    if ntwk == 'AGWX':
+        data_array_ucc[i][21] = defaultValue if station['soilt4_avg'] is None \
+                                             else round((float(station['soilt4_avg']) - 32) * 5/9, 2) #convert Fahrenheit to Celsius
+        data_array_ucc[i][22] = defaultValue if station['soilt8_avg'] is None \
+                                             else round((float(station['soilt8_avg']) - 32) * 5 / 9, 2)
 
 
 def getUCCData(count, startDate, ntwk):
@@ -216,17 +245,28 @@ def getUCCData(count, startDate, ntwk):
         data_array_ucc[i][1] = name  # station name
         data_array_ucc[i][2] = id
         data_array_ucc[i][3] = ntwk
-        data_array_ucc[i][4] = elev
+        data_array_ucc[i][4] = 0.3048 * float(elev) # elevation, convert ft to meter
         data_array_ucc[i][5] = lat  # latitude
         data_array_ucc[i][6] = long  # longitude
         getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc)
         i+=1
 
+    return data_array_ucc
+
 def run(start_date_time):
     SNTLArray = [[defaultValue]*25]
     SCANArray = [[defaultValue]*25]
+    UAGRIMETArray = [[defaultValue]*25]
+    AGWXArray = [[defaultValue]*25]
+    USUwxArray = [[defaultValue]*25]
+    FGNETArray = [[defaultValue]*25]
     SNTLArray_len = 0
     SCANArray_len = 0
+    UAGRIMET_len = 0
+    UCRN_len = 0
+    AGWX_len = 0
+    USUwx_len = 0
+    FGNET_len = 0
 
     #remove time for file name
     start_date_str = start_date_time.strftime("%Y-%m-%d")
@@ -262,10 +302,47 @@ def run(start_date_time):
     #print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
 
     #Data from UAGRIMET
-    getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET')
+    try:
+        UAGRIMETArray = getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET')
+        UAGRIMET_len = len(UAGRIMETArray)
+    except:
+        print('The UAGRIMET Network has been crashed down: {}.'.format(start_date_str))
+        print(traceback.format_exc())
+
+    # Data from UCRN
+    try:
+        UCRNArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len, start_date_time, 'UCRN')
+        UCRN_len = len(UCRNArray)
+    except:
+        print('The UCRN Network has been crashed down: {}.'.format(start_date_str))
+        print(traceback.format_exc())
+
+    # Data from AGWX
+    try:
+        AGWXArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len, start_date_time, 'AGWX')
+        AGWX_len = len(UCRNArray)
+    except:
+        print('The AGWX Network has been crashed down: {}.'.format(start_date_str))
+        print(traceback.format_exc())
+
+    # Data from USUwx
+    try:
+        USUwxArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len+AGWX_len, start_date_time, 'USUwx')
+        USUwx_len = len(USUwxArray)
+    except:
+        print('The USUwx Network has been crashed down: {}.'.format(start_date_str))
+        print(traceback.format_exc())
+
+    # Data from fgnet
+    '''try:
+        FGNETArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len + AGWX_len + FGNET_len, start_date_time, 'FGNET')
+        FGNET_len = len(FGNETArray)
+    except:
+        print('The FGNET Network has been crashed down: {}.'.format(start_date_str))
+        print(traceback.format_exc())'''
 
     #Combining data from all networks
-    data_array = np.vstack((header, SNTLArray, SCANArray))
+    data_array = np.vstack((header, SNTLArray, SCANArray, UAGRIMETArray, UCRNArray, AGWXArray, USUwxArray))
 
     #start_date_str=start_date_str.replace(":","-")
     with open('SoilMoisture_'+start_date_str+'.csv', 'w', newline='') as f: #should be wb if python2.7
