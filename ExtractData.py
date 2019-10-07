@@ -176,14 +176,12 @@ def getNRCSData(count, startDate, ntwk):
 
 def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
     endDate = startDate + datetime.timedelta(days=1)
-    startDate_str = startDate.strftime("%Y-%m-%d")
-    endDate_str = endDate.strftime("%Y-%m-%d")
     url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=english'.format(ntwk,id,startDate,endDate)
     http = urllib3.PoolManager()
     response = http.request('GET', url)
     soup = BeautifulSoup(response.data.decode('utf-8'), "html.parser")
     station = json.loads(str(soup))
-    print(station)
+    #print(station)
     if station['payload'] != False:
         station = station['payload'][0]
     else:
@@ -198,11 +196,6 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
         data_array_ucc[i][8] = (float(station['airt_avg']) - 32) * 5 / 9  # air temp, convert Fahrenheit to Celsius
     data_array_ucc[i][9] = startDate
 
-    #prep
-    if ntwk == 'AGWX':
-        data_array_ucc[i][10] = station['precip_tb']
-    else:
-        data_array_ucc[i][10] = station['precip']
 
     #mositure
     if ntwk == 'AGWX':
@@ -215,6 +208,30 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
                                              else round((float(station['soilt4_avg']) - 32) * 5/9, 2) #convert Fahrenheit to Celsius
         data_array_ucc[i][22] = defaultValue if station['soilt8_avg'] is None \
                                              else round((float(station['soilt8_avg']) - 32) * 5 / 9, 2)
+
+    # prec current day
+    if ntwk == 'AGWX':
+        data_array_ucc[i][10] = station['precip_tb']
+    else:
+        data_array_ucc[i][10] = station['precip']
+
+    #prec
+    for j in range(0, NumberOfDays-1):
+        url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=english'.format(
+            ntwk, id, PrecipitationPeriod[j+1], PrecipitationPeriod[j])
+        http = urllib3.PoolManager()
+        response = http.request('GET', url)
+        soup = BeautifulSoup(response.data.decode('utf-8'), "html.parser")
+        station = json.loads(str(soup))
+        if station['payload'] != False:
+            station = station['payload'][0]
+        else:
+            return 0
+        #print(station)
+        if ntwk == 'AGWX':
+            data_array_ucc[i][11+j] = station['precip_tb']
+        else:
+            data_array_ucc[i][11+j] = station['precip']
 
 
 def getUCCData(count, startDate, ntwk):
@@ -280,24 +297,24 @@ def run(start_date_time):
     # Data from Snotel Network
     #startTime_SNTL = dt.now()
     #print('Retrieve data from SNTL on {}'.format(startDate_print))
-    '''try:
+    try:
         SNTLArray = getNRCSData(1, start_date_time, 'SNTL')
         SNTLArray_len = len(SNTLArray)
     except:
         print('The SNTL Network has been crashed down: {}.'.format(start_date_str))
-        print(traceback.format_exc())'''
+        print(traceback.format_exc())
     #endTime_SNTL = dt.now()
     #print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
 
     #Data from Scan Network
     #startTime_SCAN = dt.now()
     #print('Retrieve data from SCAN on {}'.format(startDate_print))
-    '''try:
+    try:
         SCANArray=getNRCSData(1+SNTLArray_len, start_date_time, 'SCAN')
         SCANArray_len=len(SCANArray)
     except:
         print('The SCAN Network has been crashed down: {}.'.format(start_date_str))
-        print(traceback.format_exc())'''
+        print(traceback.format_exc())
     #endTime_SCAN = dt.now()
     #print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
 
