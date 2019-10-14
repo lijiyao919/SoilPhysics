@@ -16,7 +16,6 @@ dt=datetime.datetime
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
 nrcs_thread_num = 8
-proc_num =1
 nrcs_fail=[]
 PrecipitationPeriod = []
 header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
@@ -104,6 +103,7 @@ def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, 
         prec = awdb.service.getInstantaneousData(validSite.stationTriplet, sensor_PREC, 1, None,
                                                  startDate_str, startDate_str, 'ALL',
                                                  'ENGLISH')
+        #print(prec[0].values[0].value)
         data_array_nrcs[i][2] = prec[0].stationId  # station ID
         data_array_nrcs[i][9] = startDate
         for j in range(0, NumberOfDays):
@@ -111,7 +111,7 @@ def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, 
                                                                PrecipitationPeriod[j + 1],
                                                                PrecipitationPeriod[j + 1], 'ALL',
                                                                'ENGLISH')  # prec (inches)
-
+            #print(dayPrecipitate[0].values[0].value)
             data_array_nrcs[i][10 + j] = defaultValue if 'beginDate' not in dayPrecipitate[0] or \
                                                             'endDate' not in dayPrecipitate[0] or \
                                                             'values' not in dayPrecipitate[0] or \
@@ -119,10 +119,10 @@ def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, 
                                                             prec[0].values[0].value < dayPrecipitate[0].values[0].value \
                                                       else 25.4 * (prec[0].values[0].value - dayPrecipitate[0].values[0].value)
         #print('---Finish Snorel Station: {}'.format(i+1))
-        '''print (data_array_snortel[i][0], data_array_snortel[i][1], data_array_snortel[i][2], data_array_snortel[i][3], data_array_snortel[i][4], data_array_snortel[i][5],
-               data_array_snortel[i][6], data_array_snortel[i][7], data_array_snortel[i][8], data_array_snortel[i][9], data_array_snortel[i][10], data_array_snortel[i][11],
-               data_array_snortel[i][12], data_array_snortel[i][13], data_array_snortel[i][14], data_array_snortel[i][15], data_array_snortel[i][16], data_array_snortel[i][17],
-               data_array_snortel[i][18], data_array_snortel[i][19], data_array_snortel[i][20], data_array_snortel[i][21], data_array_snortel[i][22], data_array_snortel[i][23],data_array_snortel[i][24])'''
+        '''print (data_array_nrcs[i][0], data_array_nrcs[i][1], data_array_nrcs[i][2], data_array_nrcs[i][3], data_array_nrcs[i][4], data_array_nrcs[i][5],
+               data_array_nrcs[i][6], data_array_nrcs[i][7], data_array_nrcs[i][8], data_array_nrcs[i][9], data_array_nrcs[i][10], data_array_nrcs[i][11],
+               data_array_nrcs[i][12], data_array_nrcs[i][13], data_array_nrcs[i][14], data_array_nrcs[i][15], data_array_nrcs[i][16], data_array_nrcs[i][17],
+               data_array_nrcs[i][18], data_array_nrcs[i][19], data_array_nrcs[i][20], data_array_nrcs[i][21], data_array_nrcs[i][22], data_array_nrcs[i][23],data_array_nrcs[i][24])'''
     except Exception as e:
         print('{}: Network {} Station {} Fail.'.format(startDate, ntwk, i+1))
         nrcs_fail.append((i, validSite))
@@ -194,8 +194,6 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
     else:
         data_array_ucc[i][7] = 0.44704 * float(station['winds_avg'])  # wind_speed, convert mph to m/s
         data_array_ucc[i][8] = (float(station['airt_avg']) - 32) * 5 / 9  # air temp, convert Fahrenheit to Celsius
-    data_array_ucc[i][9] = startDate
-
 
     #mositure
     if ntwk == 'AGWX':
@@ -211,9 +209,19 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
 
     # prec current day
     if ntwk == 'AGWX':
-        data_array_ucc[i][10] = station['precip_tb']
+        data_array_ucc[i][10] = defaultValue if station['precip_tb'] is None \
+                                             else float(station['precip_tb'])*25.4 #inch to mm
+    elif ntwk == 'FGNET':
+        data_array_ucc[i][10] = defaultValue if station['tbprecp_tot_d'] is None \
+                                             else float(station['tbprecp_tot_d']) * 25.4 #inch to mm
     else:
-        data_array_ucc[i][10] = station['precip']
+        data_array_ucc[i][10] = defaultValue if station['precip'] is None \
+                                             else float(station['precip'])*25.4 #inch to mm
+
+    if data_array_ucc[i][10] == defaultValue:
+        prec_sum = 0
+    else:
+        prec_sum = data_array_ucc[i][10]
 
     #prec
     for j in range(0, NumberOfDays-1):
@@ -229,9 +237,19 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
             return 0
         #print(station)
         if ntwk == 'AGWX':
-            data_array_ucc[i][11+j] = station['precip_tb']
+            data_array_ucc[i][11+j] = defaultValue if station['precip_tb'] is None \
+                                                   else float(station['precip_tb'])*25.4+prec_sum #inch to mm
+        elif ntwk == 'FGNET':
+            data_array_ucc[i][11+j] = defaultValue if station['tbprecp_tot_d'] is None \
+                                                   else float(station['tbprecp_tot_d']) * 25.4+prec_sum #inch to mm
         else:
-            data_array_ucc[i][11+j] = station['precip']
+            data_array_ucc[i][11+j] = defaultValue if station['precip'] is None \
+                                                   else float(station['precip'])*25.4+prec_sum #inch to mm
+
+        if data_array_ucc[i][11+j] == defaultValue:
+            prec_sum = 0
+        else:
+            prec_sum = data_array_ucc[i][11+j]
 
 
 def getUCCData(count, startDate, ntwk):
@@ -265,6 +283,7 @@ def getUCCData(count, startDate, ntwk):
         data_array_ucc[i][4] = 0.3048 * float(elev) # elevation, convert ft to meter
         data_array_ucc[i][5] = lat  # latitude
         data_array_ucc[i][6] = long  # longitude
+        data_array_ucc[i][9] = startDate
         getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc)
         i+=1
 
@@ -274,6 +293,7 @@ def run(start_date_time):
     SNTLArray = [[defaultValue]*25]
     SCANArray = [[defaultValue]*25]
     UAGRIMETArray = [[defaultValue]*25]
+    UCRNArray = [[defaultValue]*25]
     AGWXArray = [[defaultValue]*25]
     USUwxArray = [[defaultValue]*25]
     FGNETArray = [[defaultValue]*25]
@@ -295,30 +315,31 @@ def run(start_date_time):
             PrecipitationPeriod.append(precipitation_date) # adding all the dates needed for
 
     # Data from Snotel Network
-    #startTime_SNTL = dt.now()
-    #print('Retrieve data from SNTL on {}'.format(startDate_print))
+    startTime_SNTL = dt.now()
+    print('Retrieve data from SNTL on {}'.format(start_date_str))
     try:
         SNTLArray = getNRCSData(1, start_date_time, 'SNTL')
         SNTLArray_len = len(SNTLArray)
     except:
         print('The SNTL Network has been crashed down: {}.'.format(start_date_str))
         print(traceback.format_exc())
-    #endTime_SNTL = dt.now()
-    #print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
+    endTime_SNTL = dt.now()
+    print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
 
     #Data from Scan Network
-    #startTime_SCAN = dt.now()
-    #print('Retrieve data from SCAN on {}'.format(startDate_print))
+    startTime_SCAN = dt.now()
+    print('Retrieve data from SCAN on {}'.format(start_date_str))
     try:
         SCANArray=getNRCSData(1+SNTLArray_len, start_date_time, 'SCAN')
         SCANArray_len=len(SCANArray)
     except:
         print('The SCAN Network has been crashed down: {}.'.format(start_date_str))
         print(traceback.format_exc())
-    #endTime_SCAN = dt.now()
-    #print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
+    endTime_SCAN = dt.now()
+    print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
 
     #Data from UAGRIMET
+    print('Retrieve data from UAGRIMET on {}'.format(start_date_str))
     try:
         UAGRIMETArray = getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET')
         UAGRIMET_len = len(UAGRIMETArray)
@@ -327,6 +348,7 @@ def run(start_date_time):
         print(traceback.format_exc())
 
     # Data from UCRN
+    print('Retrieve data from UCRN on {}'.format(start_date_str))
     try:
         UCRNArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len, start_date_time, 'UCRN')
         UCRN_len = len(UCRNArray)
@@ -335,6 +357,7 @@ def run(start_date_time):
         print(traceback.format_exc())
 
     # Data from AGWX
+    print('Retrieve data from AGWX on {}'.format(start_date_str))
     try:
         AGWXArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len, start_date_time, 'AGWX')
         AGWX_len = len(UCRNArray)
@@ -343,6 +366,7 @@ def run(start_date_time):
         print(traceback.format_exc())
 
     # Data from USUwx
+    print('Retrieve data from USUwx on {}'.format(start_date_str))
     try:
         USUwxArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len+AGWX_len, start_date_time, 'USUwx')
         USUwx_len = len(USUwxArray)
@@ -351,15 +375,16 @@ def run(start_date_time):
         print(traceback.format_exc())
 
     # Data from fgnet
-    '''try:
+    print('Retrieve data from FGNET on {}'.format(start_date_str))
+    try:
         FGNETArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len + AGWX_len + FGNET_len, start_date_time, 'FGNET')
         FGNET_len = len(FGNETArray)
     except:
         print('The FGNET Network has been crashed down: {}.'.format(start_date_str))
-        print(traceback.format_exc())'''
+        print(traceback.format_exc())
 
     #Combining data from all networks
-    data_array = np.vstack((header, SNTLArray, SCANArray, UAGRIMETArray, UCRNArray, AGWXArray, USUwxArray))
+    data_array = np.vstack((header, SNTLArray, SCANArray, UAGRIMETArray, UCRNArray, AGWXArray, USUwxArray, FGNETArray))
 
     #start_date_str=start_date_str.replace(":","-")
     with open('SoilMoisture_'+start_date_str+'.csv', 'w', newline='') as f: #should be wb if python2.7
@@ -369,19 +394,16 @@ def run(start_date_time):
 if __name__ == '__main__':
     run_start = dt.now()
     #Specify date
-    start_date_time = datetime.datetime(2017, 9, 25)
+    start_date_time = datetime.datetime(2017, 9, 12)
     end_date_time = datetime.datetime(2017, 9, 25)
     delta_date = datetime.timedelta(days = 1)
-    date_time_list=[]
-    while start_date_time <= end_date_time:
-        date_time_list.append(start_date_time)
-        start_date_time+=delta_date
-    #print(date_time_list)
 
-    pool = mp.Pool(processes=proc_num)
-    pool.map(run, date_time_list)
-    pool.close()
-    pool.join()
+    while start_date_time <= end_date_time:
+        PrecipitationPeriod = []
+        nrcs_fail = []
+        run(start_date_time)
+        start_date_time+=delta_date
+
     run_end=dt.now()
     print('Overall Time: %s' % (run_end-run_start))
 
