@@ -16,8 +16,7 @@ dt=datetime.datetime
 NumberOfDays = 5 # Number of days precipitation accumulation is needed
 defaultValue=-999999 # says value is missing or abnormal
 nrcs_thread_num = 8
-nrcs_fail=[]
-PrecipitationPeriod = []
+proc_num = 8
 header=[["Serial Number", "Station Name", "Station Id", "Network", "Elevation(meter)", "Latitude", "Longitude", "Wind Speed(m/s)", "Air Temperature(C)",
          "Start Date", "Precipitation for 1 day", "Precipitation for 2 days", "Precipitation for 3 days", "Precipitation for 4 days", "Precipitation for 5 days",
          "sm_2", "sm_4", "sm_8", "sm_20", "sm_40", "st_2", "st_4", "st_8", "st_20", "st_40"]]
@@ -31,7 +30,7 @@ def isActive(x): #check if a station is still active or not
         return True
 
 
-def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, startDate, ntwk):
+def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, startDate, ntwk, PrecipitationPeriod, nrcs_fail):
     try:
         #print('Start Snortel Station: {}'.format(i+1))
         sensor_WSPDV = r"WSPDV"  # WSPDV, WIND SPEED AVERAGE (Hourly), mph
@@ -128,7 +127,7 @@ def getStationDataFromNRCS(awdb, validSite, heights, data_array_nrcs, i, count, 
         nrcs_fail.append((i, validSite))
         #print(traceback.format_exc())
 
-def getNRCSData(count, startDate, ntwk):
+def getNRCSData(count, startDate, ntwk, PrecipitationPeriod):
     # * AWDB (Air-Water Database) web service *#
     wsdl = r"https://wcc.sc.egov.usda.gov/awdbWebService/services?WSDL"
     awdb = Client(wsdl)
@@ -153,11 +152,11 @@ def getNRCSData(count, startDate, ntwk):
 
     # * a data array for storing retrieved data *#
     data_array_nrcs = [[defaultValue]*25 for row in range(num_stations_validate)]  # a data array for storing retrieved data
-
+    nrcs_fail=[]
     # Parallel by stations
     pool = Pool(processes=nrcs_thread_num)
     for i, validSite in enumerate(meta):
-        pool.apply_async(getStationDataFromNRCS, (awdb, validSite, heights, data_array_nrcs, i, count, startDate, ntwk))
+        pool.apply_async(getStationDataFromNRCS, (awdb, validSite, heights, data_array_nrcs, i, count, startDate, ntwk, PrecipitationPeriod, nrcs_fail))
     pool.close()
     pool.join()
 
@@ -174,7 +173,7 @@ def getNRCSData(count, startDate, ntwk):
 
     return data_array_nrcs
 
-def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
+def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc, PrecipitationPeriod):
     endDate = startDate + datetime.timedelta(days=1)
     url = 'https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/network={}/station_id={}/get_daily/start_date={}/end_date={}/units=english'.format(ntwk,id,startDate,endDate)
     http = urllib3.PoolManager()
@@ -252,7 +251,7 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc):
             prec_sum = data_array_ucc[i][11+j]
 
 
-def getUCCData(count, startDate, ntwk):
+def getUCCData(count, startDate, ntwk, PrecipitationPeriod):
     stations=[]
     url = "https://climate.usu.edu/API/api.php/v2/key=600bt7gSrX85in1ptsrDhcZpi7kiKF/station_search/source=UCC/network={}".format(ntwk)
     http = urllib3.PoolManager()
@@ -284,7 +283,7 @@ def getUCCData(count, startDate, ntwk):
         data_array_ucc[i][5] = lat  # latitude
         data_array_ucc[i][6] = long  # longitude
         data_array_ucc[i][9] = startDate
-        getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc)
+        getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc, PrecipitationPeriod)
         i+=1
 
     return data_array_ucc
@@ -309,39 +308,40 @@ def run(start_date_time):
     start_date_str = start_date_time.strftime("%Y-%m-%d")
 
     #precipitation in five days
+    PrecipitationPeriod = []
     for i in range(0, NumberOfDays + 1):
             tdelta = datetime.timedelta(days=i)
             precipitation_date=str(start_date_time - tdelta)
             PrecipitationPeriod.append(precipitation_date) # adding all the dates needed for
 
     # Data from Snotel Network
-    startTime_SNTL = dt.now()
+    #startTime_SNTL = dt.now()
     print('Retrieve data from SNTL on {}'.format(start_date_str))
     try:
-        SNTLArray = getNRCSData(1, start_date_time, 'SNTL')
+        SNTLArray = getNRCSData(1, start_date_time, 'SNTL', PrecipitationPeriod)
         SNTLArray_len = len(SNTLArray)
     except:
         print('The SNTL Network has been crashed down: {}.'.format(start_date_str))
         print(traceback.format_exc())
-    endTime_SNTL = dt.now()
-    print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
+    #endTime_SNTL = dt.now()
+    #print ("SNTL Time on %s is: %s" %(start_date_str, (endTime_SNTL - startTime_SNTL)))
 
     #Data from Scan Network
-    startTime_SCAN = dt.now()
+    #startTime_SCAN = dt.now()
     print('Retrieve data from SCAN on {}'.format(start_date_str))
     try:
-        SCANArray=getNRCSData(1+SNTLArray_len, start_date_time, 'SCAN')
+        SCANArray=getNRCSData(1+SNTLArray_len, start_date_time, 'SCAN', PrecipitationPeriod)
         SCANArray_len=len(SCANArray)
     except:
         print('The SCAN Network has been crashed down: {}.'.format(start_date_str))
         print(traceback.format_exc())
-    endTime_SCAN = dt.now()
-    print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
+    #endTime_SCAN = dt.now()
+    #print ("SCAN Time on %s is: %s" % (start_date_str, (endTime_SCAN - startTime_SCAN)))
 
     #Data from UAGRIMET
     print('Retrieve data from UAGRIMET on {}'.format(start_date_str))
     try:
-        UAGRIMETArray = getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET')
+        UAGRIMETArray = getUCCData(1+SNTLArray_len+SCANArray_len, start_date_time, 'UAGRIMET', PrecipitationPeriod)
         UAGRIMET_len = len(UAGRIMETArray)
     except:
         print('The UAGRIMET Network has been crashed down: {}.'.format(start_date_str))
@@ -350,7 +350,7 @@ def run(start_date_time):
     # Data from UCRN
     print('Retrieve data from UCRN on {}'.format(start_date_str))
     try:
-        UCRNArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len, start_date_time, 'UCRN')
+        UCRNArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len, start_date_time, 'UCRN', PrecipitationPeriod)
         UCRN_len = len(UCRNArray)
     except:
         print('The UCRN Network has been crashed down: {}.'.format(start_date_str))
@@ -359,7 +359,7 @@ def run(start_date_time):
     # Data from AGWX
     print('Retrieve data from AGWX on {}'.format(start_date_str))
     try:
-        AGWXArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len, start_date_time, 'AGWX')
+        AGWXArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len, start_date_time, 'AGWX', PrecipitationPeriod)
         AGWX_len = len(UCRNArray)
     except:
         print('The AGWX Network has been crashed down: {}.'.format(start_date_str))
@@ -368,7 +368,7 @@ def run(start_date_time):
     # Data from USUwx
     print('Retrieve data from USUwx on {}'.format(start_date_str))
     try:
-        USUwxArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len+AGWX_len, start_date_time, 'USUwx')
+        USUwxArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len+AGWX_len, start_date_time, 'USUwx', PrecipitationPeriod)
         USUwx_len = len(USUwxArray)
     except:
         print('The USUwx Network has been crashed down: {}.'.format(start_date_str))
@@ -377,7 +377,7 @@ def run(start_date_time):
     # Data from fgnet
     print('Retrieve data from FGNET on {}'.format(start_date_str))
     try:
-        FGNETArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len + AGWX_len + FGNET_len, start_date_time, 'FGNET')
+        FGNETArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len + AGWX_len + USUwx_len, start_date_time, 'FGNET', PrecipitationPeriod)
         FGNET_len = len(FGNETArray)
     except:
         print('The FGNET Network has been crashed down: {}.'.format(start_date_str))
@@ -398,11 +398,15 @@ if __name__ == '__main__':
     end_date_time = datetime.datetime(2017, 9, 25)
     delta_date = datetime.timedelta(days = 1)
 
+    date_time_list = []
     while start_date_time <= end_date_time:
-        PrecipitationPeriod = []
-        nrcs_fail = []
-        run(start_date_time)
+        date_time_list.append(start_date_time)
         start_date_time+=delta_date
+
+    pool = mp.Pool(processes=proc_num)
+    pool.map(run, date_time_list)
+    pool.close()
+    pool.join()
 
     run_end=dt.now()
     print('Overall Time: %s' % (run_end-run_start))
