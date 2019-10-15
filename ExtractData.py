@@ -360,7 +360,7 @@ def run(start_date_time):
     print('Retrieve data from AGWX on {}'.format(start_date_str))
     try:
         AGWXArray = getUCCData(1 + SNTLArray_len + SCANArray_len + UAGRIMET_len + UCRN_len, start_date_time, 'AGWX', PrecipitationPeriod)
-        AGWX_len = len(UCRNArray)
+        AGWX_len = len(AGWXArray)
     except:
         print('The AGWX Network has been crashed down: {}.'.format(start_date_str))
         print(traceback.format_exc())
@@ -394,7 +394,7 @@ def run(start_date_time):
 if __name__ == '__main__':
     run_start = dt.now()
     #Specify date
-    start_date_time = datetime.datetime(2017, 9, 12)
+    start_date_time = datetime.datetime(2017, 9, 25)
     end_date_time = datetime.datetime(2017, 9, 25)
     delta_date = datetime.timedelta(days = 1)
 
