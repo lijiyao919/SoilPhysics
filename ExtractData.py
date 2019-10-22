@@ -197,7 +197,10 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc, PrecipitationP
     #mositure
     if ntwk == 'AGWX':
         data_array_ucc[i][17] = defaultValue if station['soilvwc8_avg'] is None \
-                                             else float(station['soilvwc8_avg']) / 100
+                                             else float(station['soilvwc8_avg']) / 100 #sm_8
+    elif ntwk == 'FGNET':
+        data_array_ucc[i][18] = defaultValue if station['tdr1_avg'] is None \
+                                             else float(station['tdr1_avg']) / 100 #sm_20
 
     #temperature
     if ntwk == 'AGWX':
@@ -205,6 +208,9 @@ def getStationDataFromUCC(ntwk, id, startDate, i, data_array_ucc, PrecipitationP
                                              else round((float(station['soilt4_avg']) - 32) * 5/9, 2) #convert Fahrenheit to Celsius
         data_array_ucc[i][22] = defaultValue if station['soilt8_avg'] is None \
                                              else round((float(station['soilt8_avg']) - 32) * 5 / 9, 2)
+    elif ntwk == 'FGNET':
+        data_array_ucc[i][23] = defaultValue if station['soilt1_avg'] is None \
+                                             else round((float(station['soilt1_avg']) - 32) * 5 / 9, 2)
 
     # prec current day
     if ntwk == 'AGWX':
@@ -394,7 +400,7 @@ def run(start_date_time):
 if __name__ == '__main__':
     run_start = dt.now()
     #Specify date
-    start_date_time = datetime.datetime(2017, 9, 25)
+    start_date_time = datetime.datetime(2017, 9, 12)
     end_date_time = datetime.datetime(2017, 9, 25)
     delta_date = datetime.timedelta(days = 1)
 
